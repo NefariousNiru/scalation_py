@@ -19,4 +19,4 @@ The implementation of the statistical and neural models is based on the followin
 * [Time Series Library](https://github.com/thuml/Time-Series-Library/tree/main)
 
 ## License
-The scalation_py repo is licensed under an MIT License. Please see the [license file](https://github.com/scalation/scalation_py/blob/main/License.txt). 
+The scalation_py repo is licensed under an MIT License. Please see the [license file](https://github.com/NefariousNiru/scalation_py/blob/master/License.txt). 
