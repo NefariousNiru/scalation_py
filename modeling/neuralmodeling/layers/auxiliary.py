@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class TATLinear(nn.Module):
     def __init__(
         self,
@@ -11,7 +12,7 @@ class TATLinear(nn.Module):
         use_derivative=True,
         use_decay=True,
         use_output_embedding=False,
-        embed_dim=16
+        embed_dim=16,
     ):
         super().__init__()
         self.in_features = in_features
@@ -26,16 +27,24 @@ class TATLinear(nn.Module):
 
         # Base weight setup
         if use_output_embedding:
-            self.output_embed = nn.Parameter(torch.randn(out_features, embed_dim) * 0.01)
-            self.weight_base = nn.Parameter(torch.randn(embed_dim, self.effective_in_features) * 0.01)
+            self.output_embed = nn.Parameter(
+                torch.randn(out_features, embed_dim) * 0.01
+            )
+            self.weight_base = nn.Parameter(
+                torch.randn(embed_dim, self.effective_in_features) * 0.01
+            )
         else:
-            self.weight = nn.Parameter(torch.randn(out_features, self.effective_in_features) * 0.01)
+            self.weight = nn.Parameter(
+                torch.randn(out_features, self.effective_in_features) * 0.01
+            )
 
         self.bias = nn.Parameter(torch.zeros(out_features)) if bias else None
 
         if use_decay:
             base_decay = torch.linspace(1.0, 0.5, in_features)
-            decay = base_decay.repeat(2 if use_derivative else 1)  # [effective_in_features]
+            decay = base_decay.repeat(
+                2 if use_derivative else 1
+            )  # [effective_in_features]
             self.decay = nn.Parameter(decay)
 
     def forward(self, x):
@@ -57,7 +66,9 @@ class TATLinear(nn.Module):
 
         # Weight projection
         if self.use_output_embedding:
-            W = torch.matmul(self.output_embed, self.weight_base)  # [out_features, effective_in_features]
+            W = torch.matmul(
+                self.output_embed, self.weight_base
+            )  # [out_features, effective_in_features]
         else:
             W = self.weight  # [out_features, effective_in_features]
 

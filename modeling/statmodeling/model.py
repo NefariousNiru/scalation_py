@@ -18,13 +18,15 @@ import datetime
 from util.plotting import plot_forecasts
 from util.QoF import diagnose
 from util.tools import display_save_results
+
 np.set_printoptions(suppress=True)
+
 
 class Model:
     def __init__(self, args):
         self.args = args
-        self.modeling_type = 'statistical'
-        self.modeling_approach = 'joint'
+        self.modeling_type = "statistical"
+        self.modeling_approach = "joint"
         self.data_path = args.data_path
         self.skip_insample = self.args.skip_insample
         self.target = self.args.target
@@ -41,12 +43,36 @@ class Model:
 
         self.debugging = self.args.debugging
 
-        self.forecast_type = self.args.forecast_type.lower() if self.args.forecast_type is not None else None
-        self.plot_scope_scale = self.args.plot_scope_scale.lower() if self.args.plot_scope_scale is not None else self.args.plot_scope_scale
-        self.features = self.args.features.lower() if self.args.features is not None else self.args.features
-        self.qof_calculation_mode = self.args.qof_calculation_mode.lower() if self.args.qof_calculation_mode is not None else self.args.qof_calculation_mode
-        self.normalization = self.args.normalization.lower() if self.args.normalization is not None else self.args.normalization
-        self.modeling_approach = self.args.modeling_approach.lower() if self.args.modeling_approach is not None else self.args.modeling_approach
+        self.forecast_type = (
+            self.args.forecast_type.lower()
+            if self.args.forecast_type is not None
+            else None
+        )
+        self.plot_scope_scale = (
+            self.args.plot_scope_scale.lower()
+            if self.args.plot_scope_scale is not None
+            else self.args.plot_scope_scale
+        )
+        self.features = (
+            self.args.features.lower()
+            if self.args.features is not None
+            else self.args.features
+        )
+        self.qof_calculation_mode = (
+            self.args.qof_calculation_mode.lower()
+            if self.args.qof_calculation_mode is not None
+            else self.args.qof_calculation_mode
+        )
+        self.normalization = (
+            self.args.normalization.lower()
+            if self.args.normalization is not None
+            else self.args.normalization
+        )
+        self.modeling_approach = (
+            self.args.modeling_approach.lower()
+            if self.args.modeling_approach is not None
+            else self.args.modeling_approach
+        )
 
         if self.training_ratio <= 0 or self.training_ratio >= 100:
             raise ValueError(
@@ -54,28 +80,37 @@ class Model:
                 f"Received: {self.training_ratio}."
             )
 
-        self.training_ratio = self.args.training_ratio/100 if isinstance(self.args.training_ratio, int) else self.args.training_ratio
+        self.training_ratio = (
+            self.args.training_ratio / 100
+            if isinstance(self.args.training_ratio, int)
+            else self.args.training_ratio
+        )
 
-
-        if self.forecast_type not in ['point', 'interval']:
+        if self.forecast_type not in ["point", "interval"]:
             raise ValueError(
                 f"Invalid value for 'forecast_type'. Expected one of the following 'point' or 'interval'\n"
                 f"Received: {self.forecast_type}."
             )
 
-        if self.plot_scope_scale not in ['all_original', 'all_normalized', 'test_original', 'test_normalized', None]:
+        if self.plot_scope_scale not in [
+            "all_original",
+            "all_normalized",
+            "test_original",
+            "test_normalized",
+            None,
+        ]:
             raise ValueError(
                 f"Invalid value for 'plot_scope_scale'. Expected one of the following 'all_original', 'all_normalized', 'test_original', 'test_normalized', or None\n"
                 f"Received: {self.plot_scope_scale}."
             )
 
-        if self.features not in ['ms', 'm', 's']:
+        if self.features not in ["ms", "m", "s"]:
             raise ValueError(
                 f"Invalid value for 'features'. Expected one of the following 'ms', 'm', 's'\n"
                 f"Received: {self.features}."
             )
 
-        if self.qof_calculation_mode not in ['single_horizon', 'aggregated_horizons']:
+        if self.qof_calculation_mode not in ["single_horizon", "aggregated_horizons"]:
             raise ValueError(
                 f"Invalid value for 'qof_calculation_mode'. Expected one of the following 'single_horizon' or 'aggregated_horizons'\n"
                 f"Received: {self.qof_calculation_mode}."
@@ -99,15 +134,13 @@ class Model:
                 f"Received: {self.horizons}."
             )
 
-
-
-        if self.normalization not in ['log', 'z-score', 'log_z-score', None]:
+        if self.normalization not in ["log", "z-score", "log_z-score", None]:
             raise ValueError(
                 f"Invalid value for 'normalization'. Expected one of the following 'log', 'z-score', or None.\n"
                 f"Received: {self.normalization}."
             )
 
-        if self.modeling_approach not in ['joint', 'individual']:
+        if self.modeling_approach not in ["joint", "individual"]:
             raise ValueError(
                 f"Invalid value for 'modeling_approach'. Expected 'joint' or 'individual'.\n"
                 f"Received: {self.modeling_approach}."
@@ -117,9 +150,9 @@ class Model:
             self.horizons.sort()
 
         if self.skip_insample is None:
-            self.validation = 'Out-of-Sample'
+            self.validation = "Out-of-Sample"
         else:
-            self.validation = 'In-Sample'
+            self.validation = "In-Sample"
 
         self.pred_len = max(self.horizons)
 
@@ -132,7 +165,7 @@ class Model:
                 f"Received: {self.target}."
             )
 
-        if self.features == 's':
+        if self.features == "s":
             self.data = self.data[[self.target.lower()]]
         """
         if self.debugging:
@@ -150,14 +183,22 @@ class Model:
         self.n_features = len(self.data.columns)
 
         self.qof = None
-        self.today = str(datetime.datetime.today().strftime('%Y-%m-%d'))
+        self.today = str(datetime.datetime.today().strftime("%Y-%m-%d"))
 
     def trainNtest(self) -> np.array:
 
         self.df_raw_len = len(self.data)
-        self.folder_path_plots = './plots/' + str(self.validation) + '/' + self.model_name + '/' + str(
-            self.dataset) + '/' + str(self.pred_len)
-        self.folder_path_results = './results/' + str(self.validation) + '/'
+        self.folder_path_plots = (
+            "./plots/"
+            + str(self.validation)
+            + "/"
+            + self.model_name
+            + "/"
+            + str(self.dataset)
+            + "/"
+            + str(self.pred_len)
+        )
+        self.folder_path_results = "./results/" + str(self.validation) + "/"
 
         if not os.path.exists(self.folder_path_plots):
             os.makedirs(self.folder_path_plots)
@@ -166,40 +207,50 @@ class Model:
 
         self.data_ = copy.deepcopy(self.data)
 
-
-
-
         if self.normalization is not None:
             self.data = transform_data(self)
 
         if self.skip_insample is None:
-            self.train_data, _, self.test_data = train_test_split(self.data, train_ratio=self.training_ratio)
+            self.train_data, _, self.test_data = train_test_split(
+                self.data, train_ratio=self.training_ratio
+            )
             self.train_size = len(self.train_data)
             self.test_size = len(self.test_data)
         else:
             self.train_size = self.skip_insample
             self.test_size = len(self.data) - self.skip_insample
 
-
         if self.skip_insample is None:
-            self.sample_mean = self.data_.iloc[:self.train_size,:].mean().to_frame().T
-            self.sample_mean_normalized = self.data.iloc[:self.train_size,:].mean().to_frame().T
+            self.sample_mean = self.data_.iloc[: self.train_size, :].mean().to_frame().T
+            self.sample_mean_normalized = (
+                self.data.iloc[: self.train_size, :].mean().to_frame().T
+            )
         else:
-            self.sample_mean = self.data_.iloc[self.skip_insample:,:].mean().to_frame().T
-            self.sample_mean_normalized = self.data.iloc[self.skip_insample:,:].mean().to_frame().T
+            self.sample_mean = (
+                self.data_.iloc[self.skip_insample :, :].mean().to_frame().T
+            )
+            self.sample_mean_normalized = (
+                self.data.iloc[self.skip_insample :, :].mean().to_frame().T
+            )
 
-        if self.features == 'm':
+        if self.features == "m":
             self.sample_mean = self.sample_mean
             self.sample_mean_normalized = self.sample_mean_normalized
-        elif self.features == 'ms':
+        elif self.features == "ms":
             self.sample_mean = self.sample_mean.iloc[:, self.target_feature]
-            self.sample_mean_normalized = self.sample_mean_normalized.iloc[:, self.target_feature]
-        elif self.features == 's':
+            self.sample_mean_normalized = self.sample_mean_normalized.iloc[
+                :, self.target_feature
+            ]
+        elif self.features == "s":
             self.sample_mean = self.sample_mean
             self.sample_mean_normalized = self.sample_mean_normalized
 
         if self.rc is not None:
-            if self.skip_insample is not None and self.rc < self.test_size and self.rc is not None:
+            if (
+                self.skip_insample is not None
+                and self.rc < self.test_size
+                and self.rc is not None
+            ):
                 raise ValueError(
                     f"Invalid value for 'rc'. Expected a number greater that the test set size ({self.test_size}).\n"
                     f"For in-sample validation, the model will be fitted once on the entire dataset. Retraining cycle is not required.\n"
@@ -216,7 +267,7 @@ class Model:
 
         start_time = time.time()
 
-        if self.modeling_approach == 'joint':
+        if self.modeling_approach == "joint":
             self.train_test()
             self.forecast_tensor_original = inverse_transformation(self)
             if self.plot_scope_scale is not None:
@@ -227,7 +278,7 @@ class Model:
             else:
                 diagnose(self)
 
-        elif self.modeling_approach == 'individual':
+        elif self.modeling_approach == "individual":
             for h in self.args.horizons:
 
                 self.horizons = [h]
@@ -245,7 +296,6 @@ class Model:
         if self.args.internal_diagonse is None:
             print(self.args)
             display_save_results(self)
-
 
         end_time = time.time()
         total_time = end_time - start_time

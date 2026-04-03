@@ -10,11 +10,13 @@ from joblib import Parallel, delayed
 import torch
 import numpy as np
 import pyscamp
+
+
 class DigitEmbedding(nn.Module):
     def __init__(self, max_digits=32, embedding_dim=16):
         """
         Digit-based embedding module to handle signs, digits, and decimal points.
-        
+
         Args:
             max_digits (int): Maximum number of digits to represent a number.
             embedding_dim (int): Dimension for each digit's embedding.
@@ -22,20 +24,28 @@ class DigitEmbedding(nn.Module):
         super(DigitEmbedding, self).__init__()
         self.max_digits = max_digits
         self.embedding_dim = embedding_dim
-        
+
         # Embedding layers for digits, sign, and decimal point
-        self.digit_embedding = nn.Embedding(10, embedding_dim)  # Embedding for digits 0-9
-        self.sign_embedding = nn.Embedding(3, embedding_dim)  # Embedding for signs: {0: positive, 1: negative}
-        self.decimal_embedding = nn.Embedding(1, embedding_dim)  # Embedding for decimal point
-        self.positional_encoding = nn.Embedding(max_digits + 2, embedding_dim)  # Positional encoding
+        self.digit_embedding = nn.Embedding(
+            10, embedding_dim
+        )  # Embedding for digits 0-9
+        self.sign_embedding = nn.Embedding(
+            3, embedding_dim
+        )  # Embedding for signs: {0: positive, 1: negative}
+        self.decimal_embedding = nn.Embedding(
+            1, embedding_dim
+        )  # Embedding for decimal point
+        self.positional_encoding = nn.Embedding(
+            max_digits + 2, embedding_dim
+        )  # Positional encoding
 
     def forward(self, x):
         """
         Forward pass for digit-based embedding.
-        
+
         Args:
             x (Tensor): Input tensor of shape [batch_size, channels, seq_len, 1].
-        
+
         Returns:
             Tensor: Embedded tensor of shape [batch_size, channels, seq_len, embedding_dim].
         """
@@ -65,37 +75,60 @@ class DigitEmbedding(nn.Module):
                 if char.isdigit():
                     digits.append(int(char))
                     positions.append(i)
-                elif char == '.':
+                elif char == ".":
                     digits.append(0)  # Placeholder for the decimal
                     positions.append(i)
 
             # Pad digits and positions to max_digits
-            digits = digits[:self.max_digits] + [0] * (self.max_digits - len(digits))
-            positions = positions[:self.max_digits] + [0] * (self.max_digits - len(positions))
+            digits = digits[: self.max_digits] + [0] * (self.max_digits - len(digits))
+            positions = positions[: self.max_digits] + [0] * (
+                self.max_digits - len(positions)
+            )
             digit_list.append(digits)
             position_list.append(positions)
 
         # Convert to tensors
-        digits_tensor = torch.tensor(digit_list, device=x.device)  # Shape: [batch_size * seq_len, max_digits]
-        positions_tensor = torch.tensor(position_list, device=x.device)  # Shape: [batch_size * seq_len, max_digits]
-        signs_tensor = torch.tensor(sign_list, device=x.device)  # Shape: [batch_size * seq_len]
+        digits_tensor = torch.tensor(
+            digit_list, device=x.device
+        )  # Shape: [batch_size * seq_len, max_digits]
+        positions_tensor = torch.tensor(
+            position_list, device=x.device
+        )  # Shape: [batch_size * seq_len, max_digits]
+        signs_tensor = torch.tensor(
+            sign_list, device=x.device
+        )  # Shape: [batch_size * seq_len]
 
         # Digit embeddings
-        digit_embeddings = self.digit_embedding(digits_tensor)  # Shape: [batch_size * seq_len, max_digits, embedding_dim]
-        
+        digit_embeddings = self.digit_embedding(
+            digits_tensor
+        )  # Shape: [batch_size * seq_len, max_digits, embedding_dim]
+
         # Positional encodings
-        positional_encodings = self.positional_encoding(positions_tensor)  # Shape: [batch_size * seq_len, max_digits, embedding_dim]
-        
+        positional_encodings = self.positional_encoding(
+            positions_tensor
+        )  # Shape: [batch_size * seq_len, max_digits, embedding_dim]
+
         # Sign embeddings
-        sign_embeddings = self.sign_embedding(signs_tensor).unsqueeze(1)  # Shape: [batch_size * seq_len, 1, embedding_dim]
-        
+        sign_embeddings = self.sign_embedding(signs_tensor).unsqueeze(
+            1
+        )  # Shape: [batch_size * seq_len, 1, embedding_dim]
+
         # Combine embeddings
-        combined_embeddings = digit_embeddings + positional_encodings  # Add digit and positional embeddings
-        combined_embeddings = combined_embeddings.sum(dim=1)  # Aggregate along the digits
-        combined_embeddings = combined_embeddings + sign_embeddings.squeeze(1)  # Add sign embedding
+        combined_embeddings = (
+            digit_embeddings + positional_encodings
+        )  # Add digit and positional embeddings
+        combined_embeddings = combined_embeddings.sum(
+            dim=1
+        )  # Aggregate along the digits
+        combined_embeddings = combined_embeddings + sign_embeddings.squeeze(
+            1
+        )  # Add sign embedding
 
         # Reshape back to [batch_size, channels, seq_len, embedding_dim]
-        return combined_embeddings.view(batch_size, channels, seq_len, self.embedding_dim)
+        return combined_embeddings.view(
+            batch_size, channels, seq_len, self.embedding_dim
+        )
+
 
 class PositionalEmbedding(nn.Module):
     def __init__(self, d_model, max_len=5000):
@@ -105,32 +138,42 @@ class PositionalEmbedding(nn.Module):
         pe.require_grad = False
 
         position = torch.arange(0, max_len).float().unsqueeze(1)
-        div_term = (torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)).exp()
+        div_term = (
+            torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)
+        ).exp()
 
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
 
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
-        return self.pe[:, :x.size(1)]
+        return self.pe[:, : x.size(1)]
 
 
 class TokenEmbedding(nn.Module):
     def __init__(self, c_in, d_model):
         super(TokenEmbedding, self).__init__()
         padding = 1
-        self.tokenConv = nn.Conv1d(in_channels=c_in, out_channels=d_model, 
-                                    kernel_size=3, padding=padding, padding_mode='circular')
+        self.tokenConv = nn.Conv1d(
+            in_channels=c_in,
+            out_channels=d_model,
+            kernel_size=3,
+            padding=padding,
+            padding_mode="circular",
+        )
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
-                nn.init.kaiming_normal_(m.weight,mode='fan_in',nonlinearity='leaky_relu')
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_in", nonlinearity="leaky_relu"
+                )
 
     def forward(self, x):
-        x = self.tokenConv(x.permute(0, 2, 1)).transpose(1,2)
+        x = self.tokenConv(x.permute(0, 2, 1)).transpose(1, 2)
         return x
-    
+
+
 """
 class TokenEmbedding(nn.Module):
     def __init__(self, c_in, d_model):
@@ -159,7 +202,9 @@ class FixedEmbedding(nn.Module):
         w.require_grad = False
 
         position = torch.arange(0, c_in).float().unsqueeze(1)
-        div_term = (torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)).exp()
+        div_term = (
+            torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)
+        ).exp()
 
         w[:, 0::2] = torch.sin(position * div_term)
         w[:, 1::2] = torch.cos(position * div_term)
@@ -171,12 +216,11 @@ class FixedEmbedding(nn.Module):
         return self.emb(x).detach()
 
 
-
 class TimeFeatureEmbedding(nn.Module):
-    def __init__(self, d_model, embed_type='timeF', freq='h'):
+    def __init__(self, d_model, embed_type="timeF", freq="h"):
         super(TimeFeatureEmbedding, self).__init__()
 
-        freq_map = {'h': 4, 't': 5, 's': 6, 'm': 1, 'a': 1, 'w': 2, 'd': 3, 'b': 3}
+        freq_map = {"h": 4, "t": 5, "s": 6, "m": 1, "a": 1, "w": 2, "d": 3, "b": 3}
         d_inp = freq_map[freq]
         self.embed = nn.Linear(d_inp, d_model, bias=False)
 
@@ -185,43 +229,52 @@ class TimeFeatureEmbedding(nn.Module):
 
 
 class DataEmbedding(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
         self.position_embedding = PositionalEmbedding(d_model=d_model)
-        self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
-                                                    freq=freq) if embed_type != 'timeF' else TimeFeatureEmbedding(
-            d_model=d_model, embed_type=embed_type, freq=freq)
+        self.temporal_embedding = (
+            TemporalEmbedding(d_model=d_model, embed_type=embed_type, freq=freq)
+            if embed_type != "timeF"
+            else TimeFeatureEmbedding(d_model=d_model, embed_type=embed_type, freq=freq)
+        )
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x, x_mark):
-        x = self.value_embedding(x) + self.temporal_embedding(x_mark) + self.position_embedding(x)
+        x = (
+            self.value_embedding(x)
+            + self.temporal_embedding(x_mark)
+            + self.position_embedding(x)
+        )
         return self.dropout(x)
 
 
 class DataEmbedding_wo_pos(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_wo_pos, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
         self.position_embedding = PositionalEmbedding(d_model=d_model)
-        self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
-                                                    freq=freq) if embed_type != 'timeF' else TimeFeatureEmbedding(
-            d_model=d_model, embed_type=embed_type, freq=freq)
+        self.temporal_embedding = (
+            TemporalEmbedding(d_model=d_model, embed_type=embed_type, freq=freq)
+            if embed_type != "timeF"
+            else TimeFeatureEmbedding(d_model=d_model, embed_type=embed_type, freq=freq)
+        )
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x, x_mark):
         x = self.value_embedding(x) + self.temporal_embedding(x_mark)
         return self.dropout(x)
 
+
 class DataEmbedding_wo_pos_temp(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_wo_pos_temp, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
-        #self.position_embedding = PositionalEmbedding(d_model=d_model)
-        #self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
+        # self.position_embedding = PositionalEmbedding(d_model=d_model)
+        # self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
         #                                            freq=freq) if embed_type != 'timeF' else TimeFeatureEmbedding(
         #    d_model=d_model, embed_type=embed_type, freq=freq)
         self.dropout = nn.Dropout(p=dropout)
@@ -230,8 +283,9 @@ class DataEmbedding_wo_pos_temp(nn.Module):
         x = self.value_embedding(x)
         return self.dropout(x)
 
+
 class DataEmbedding_wo_temp(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_wo_temp, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
@@ -241,9 +295,10 @@ class DataEmbedding_wo_temp(nn.Module):
     def forward(self, x, x_mark):
         x = self.value_embedding(x) + self.position_embedding(x)
         return self.dropout(x)
-    
+
+
 class DataEmbedding_wo_temp_five(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_wo_temp_five, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
@@ -256,7 +311,7 @@ class DataEmbedding_wo_temp_five(nn.Module):
 
 
 class DataEmbedding_wo_time(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_wo_time, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
@@ -266,9 +321,10 @@ class DataEmbedding_wo_time(nn.Module):
     def forward(self, x):
         x = self.value_embedding(x) + self.position_embedding(x)
         return self.dropout(x)
-    
+
+
 class TemporalEmbedding(nn.Module):
-    def __init__(self, d_model, embed_type='fixed', freq='h'):
+    def __init__(self, d_model, embed_type="fixed", freq="h"):
         super(TemporalEmbedding, self).__init__()
 
         minute_size = 4
@@ -277,8 +333,8 @@ class TemporalEmbedding(nn.Module):
         day_size = 32
         month_size = 13
 
-        Embed = FixedEmbedding if embed_type == 'fixed' else nn.Embedding
-        if freq == 't':
+        Embed = FixedEmbedding if embed_type == "fixed" else nn.Embedding
+        if freq == "t":
             self.minute_embed = Embed(minute_size, d_model)
         self.hour_embed = Embed(hour_size, d_model)
         self.weekday_embed = Embed(weekday_size, d_model)
@@ -288,14 +344,17 @@ class TemporalEmbedding(nn.Module):
     def forward(self, x):
         x = x.long()
 
-        minute_x = self.minute_embed(x[:, :, 4]) if hasattr(self, 'minute_embed') else 0.
+        minute_x = (
+            self.minute_embed(x[:, :, 4]) if hasattr(self, "minute_embed") else 0.0
+        )
         hour_x = self.hour_embed(x[:, :, 3])
         weekday_x = self.weekday_embed(x[:, :, 2])
         day_x = self.day_embed(x[:, :, 1])
         month_x = self.month_embed(x[:, :, 0])
 
         return hour_x + weekday_x + day_x + month_x + minute_x
-    
+
+
 class DSW_embedding(nn.Module):
     def __init__(self, seg_len, d_model, freq, stride, dropout_embed):
         super(DSW_embedding, self).__init__()
@@ -304,34 +363,51 @@ class DSW_embedding(nn.Module):
         self.d_model = d_model
         self.linear_x_embed = nn.Linear(seg_len, d_model)
         self.dropout = nn.Dropout(p=dropout_embed)
+
     def forward(self, x, x_mark):
         batch, ts_len, ts_dim = x.shape
-        x = x.permute(0,2,1)
-        x = x.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        x = x.permute(0, 2, 1)
+        x = x.unfold(dimension=-1, size=self.seg_len, step=self.stride)
         x = self.linear_x_embed(x)
         return self.dropout(x)
 
-    
 
 class DynamicPatching(nn.Module):
     def __init__(self):
         super(DynamicPatching, self).__init__()
+
     def forward(self, tensor, change_points_batch):
-        max_segments = max(len(change_points) - 1 for change_points in change_points_batch)
+        max_segments = max(
+            len(change_points) - 1 for change_points in change_points_batch
+        )
         segmented_tensors = []
         for i, change_points in enumerate(change_points_batch):
-            segments = [tensor[i, :, change_points[j]:change_points[j+1]] for j in range(len(change_points)-1)]
+            segments = [
+                tensor[i, :, change_points[j] : change_points[j + 1]]
+                for j in range(len(change_points) - 1)
+            ]
             segmented_tensors.append(segments)
         max_segments = max(len(segment) for segment in segmented_tensors)
-        max_length = max(len(i) for segment in segmented_tensors for item in segment for i in item)
-        segments = [[torch.nn.functional.pad(segment, (0, max_length - segment.size(1))) for segment in batch] for batch in segmented_tensors]
+        max_length = max(
+            len(i) for segment in segmented_tensors for item in segment for i in item
+        )
+        segments = [
+            [
+                torch.nn.functional.pad(segment, (0, max_length - segment.size(1)))
+                for segment in batch
+            ]
+            for batch in segmented_tensors
+        ]
         for batch in segments:
             if len(batch) < max_segments:
-                pad_segments = [torch.zeros_like(batch[0]) for _ in range(max_segments - len(batch))]
+                pad_segments = [
+                    torch.zeros_like(batch[0]) for _ in range(max_segments - len(batch))
+                ]
                 batch.extend(pad_segments)
         tensor_segments = torch.stack([torch.stack(batch) for batch in segments])
         return tensor_segments
-    
+
+
 class enc_embedding_enc(nn.Module):
     def __init__(self, d_model, seq_len, seg_len, stride, dropout_embed, freq):
         super(enc_embedding_enc, self).__init__()
@@ -341,44 +417,57 @@ class enc_embedding_enc(nn.Module):
         self.DynamicPatching = DynamicPatching()
 
         self.position_embedding = PositionalEmbeddingPatches(d_model=d_model)
-        self.temporal_embedding = TimeFeatureEmbeddingPatches(d_model=d_model, freq=freq)
+        self.temporal_embedding = TimeFeatureEmbeddingPatches(
+            d_model=d_model, freq=freq
+        )
         self.linear = nn.AdaptiveAvgPool1d(16)
 
         self.dropout = nn.Dropout(p=dropout_embed)
+
     def forward(self, x, x_mark):
         batch, ts_len, ts_dim = x.shape
-        
+
         pe = self.position_embedding(x)
 
-        x = x.permute(0,2,1)
-        x = x.reshape(x.shape[0]*x.shape[1], x.shape[2]).unsqueeze(1)
-        
+        x = x.permute(0, 2, 1)
+        x = x.reshape(x.shape[0] * x.shape[1], x.shape[2]).unsqueeze(1)
+
         xcp = x.cpu().numpy().squeeze()
-        
+
         change_points_batch = []
         for i in tqdm(range(xcp.shape[0])):
             signal = xcp[i]
-            algo = rpt.Pelt(model="rbf", min_size = 12).fit(signal)
+            algo = rpt.Pelt(model="rbf", min_size=12).fit(signal)
             result = algo.predict(pen=10)
             result = [0] + result + [xcp.shape[-1]]
             change_points_batch.append(result)
-        
+
         x = self.DynamicPatching(x, change_points_batch)
         x_embed = self.linear(x.squeeze())
-        x_embed = rearrange(x_embed, '(b dim) seg_num d_model -> b dim seg_num d_model', b = batch, dim = 7)
-        
-        pe = pe.repeat(batch*7, 1, 1)
+        x_embed = rearrange(
+            x_embed, "(b dim) seg_num d_model -> b dim seg_num d_model", b=batch, dim=7
+        )
+
+        pe = pe.repeat(batch * 7, 1, 1)
         pe = self.DynamicPatching(pe, change_points_batch)
         pe = self.linear(pe.squeeze())
-        pe = rearrange(pe, '(b dim) seg_num d_model -> b dim seg_num d_model', b = batch, dim = 7)
-        
-        x_mark = x_mark.repeat(batch*7, 1, 1)
+        pe = rearrange(
+            pe, "(b dim) seg_num d_model -> b dim seg_num d_model", b=batch, dim=7
+        )
+
+        x_mark = x_mark.repeat(batch * 7, 1, 1)
         time_embed = self.temporal_embedding(x_mark)
         time_embed = self.DynamicPatching(time_embed, change_points_batch)
         time_embed = self.linear(time_embed.squeeze())
-        time_embed = rearrange(time_embed, '(b dim) seg_num d_model -> b dim seg_num d_model', b = batch, dim = 7)
-        
+        time_embed = rearrange(
+            time_embed,
+            "(b dim) seg_num d_model -> b dim seg_num d_model",
+            b=batch,
+            dim=7,
+        )
+
         return self.dropout(x_embed + pe + time_embed)
+
 
 class enc_embedding_dec(nn.Module):
     def __init__(self, d_model, seq_len, seg_len, stride, dropout_embed, freq):
@@ -387,24 +476,30 @@ class enc_embedding_dec(nn.Module):
         self.stride = stride
         self.d_model = d_model
         self.position_embedding = PositionalEmbeddingPatches(d_model=d_model)
-        self.linear_x_pe = nn.Linear(seg_len, d_model, bias = True)
-        self.linear_x_embed = nn.Linear(seg_len, d_model, bias = True)
-        self.temporal_embedding = TimeFeatureEmbeddingPatches(d_model=d_model, freq=freq)
-        self.linear_x_temporal = nn.Linear(seg_len, d_model, bias = True)
+        self.linear_x_pe = nn.Linear(seg_len, d_model, bias=True)
+        self.linear_x_embed = nn.Linear(seg_len, d_model, bias=True)
+        self.temporal_embedding = TimeFeatureEmbeddingPatches(
+            d_model=d_model, freq=freq
+        )
+        self.linear_x_temporal = nn.Linear(seg_len, d_model, bias=True)
         self.dropout = nn.Dropout(p=dropout_embed)
+
     def forward(self, x, x_mark):
         batch, ts_len, ts_dim = x.shape
         pe = self.position_embedding(x)
-        pe = pe.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        pe = pe.unfold(dimension=-1, size=self.seg_len, step=self.stride)
         pe = self.linear_x_pe(pe)
-        x = x.permute(0,2,1)
-        x = x.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        x = x.permute(0, 2, 1)
+        x = x.unfold(dimension=-1, size=self.seg_len, step=self.stride)
         x_embed = self.linear_x_embed(x)
         time_embed = self.temporal_embedding(x_mark)
-        time_embed = time_embed.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        time_embed = time_embed.unfold(
+            dimension=-1, size=self.seg_len, step=self.stride
+        )
         time_embed = self.linear_x_temporal(time_embed)
         return self.dropout(x_embed + time_embed + pe)
-    
+
+
 class dec_embedding(nn.Module):
     def __init__(self, d_model, seq_len, seg_len, stride, dropout_embed, freq):
         super(dec_embedding, self).__init__()
@@ -414,30 +509,41 @@ class dec_embedding(nn.Module):
         if seq_len == seg_len:
             self.segments = 1
         else:
-            self.segments = int(((seq_len - seg_len)/stride)+1)
+            self.segments = int(((seq_len - seg_len) / stride) + 1)
         self.position_embedding = PositionalEmbeddingPatches(d_model=d_model)
-        self.linear_x_pe = nn.Linear(seg_len, d_model, bias = False)
-        self.linear_x_embed = nn.Conv1d(in_channels=self.seg_len, out_channels=self.d_model,
-                 kernel_size=3, padding=1, padding_mode='circular')
-        
-        self.temporal_embedding = TimeFeatureEmbeddingPatches(d_model=d_model, freq=freq)
-        self.linear_x_temporal = nn.Linear(seg_len, d_model, bias = False)
+        self.linear_x_pe = nn.Linear(seg_len, d_model, bias=False)
+        self.linear_x_embed = nn.Conv1d(
+            in_channels=self.seg_len,
+            out_channels=self.d_model,
+            kernel_size=3,
+            padding=1,
+            padding_mode="circular",
+        )
+
+        self.temporal_embedding = TimeFeatureEmbeddingPatches(
+            d_model=d_model, freq=freq
+        )
+        self.linear_x_temporal = nn.Linear(seg_len, d_model, bias=False)
         self.dropout = nn.Dropout(p=dropout_embed)
+
     def forward(self, x, x_mark):
         batch, ts_len, ts_dim = x.shape
         pe = self.position_embedding(x)
-        pe = pe.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        pe = pe.unfold(dimension=-1, size=self.seg_len, step=self.stride)
         pe = self.linear_x_pe(pe)
-        x = x.permute(0,2,1)
-        x = x.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        x = x.permute(0, 2, 1)
+        x = x.unfold(dimension=-1, size=self.seg_len, step=self.stride)
         x_embed = self.linear_x_embed(x)
         time_embed = self.temporal_embedding(x_mark)
-        time_embed = time_embed.unfold(dimension = -1, size = self.seg_len, step = self.stride)
+        time_embed = time_embed.unfold(
+            dimension=-1, size=self.seg_len, step=self.stride
+        )
         time_embed = self.linear_x_temporal(time_embed)
         return self.dropout(x_embed + time_embed + pe)
-    
+
+
 class DataEmbedding_inverted(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_inverted, self).__init__()
         self.value_embedding = nn.Linear(c_in, d_model)
         self.dropout = nn.Dropout(p=dropout)
@@ -449,7 +555,7 @@ class DataEmbedding_inverted(nn.Module):
             x = self.value_embedding(x)
         else:
             # the potential to take covariates (e.g. timestamps) as tokens
-            x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1)) 
+            x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1))
         # x: [Batch Variate d_model]
         return self.dropout(x)
 
@@ -457,7 +563,7 @@ class DataEmbedding_inverted(nn.Module):
 class TimeFeatureEmbeddingPatches(nn.Module):
     def __init__(self, d_model, freq):
         super(TimeFeatureEmbeddingPatches, self).__init__()
-        freq_map = {'h': 4, 't': 5, 's': 6, 'm': 1, 'a': 1, 'W': 2, 'd': 3, 'b': 3}
+        freq_map = {"h": 4, "t": 5, "s": 6, "m": 1, "a": 1, "W": 2, "d": 3, "b": 3}
         self.d_inp = freq_map[freq]
         self.te = nn.Linear(self.d_inp, 1)
 
@@ -472,21 +578,22 @@ class PositionalEmbeddingPatches(nn.Module):
         pe = torch.zeros(max_len, d_model).float()
         pe.require_grad = False
         position = torch.arange(0, max_len).float().unsqueeze(1)
-        div_term = (torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)).exp()
+        div_term = (
+            torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)
+        ).exp()
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
         self.linear = nn.Linear(d_model, 1)
 
     def forward(self, x):
-        pe = self.pe[:, :x.size(1)]
+        pe = self.pe[:, : x.size(1)]
         pe = self.linear(pe).permute(0, 2, 1)
         return pe
 
 
-
-#---------------------------------start here-----------------------------------------------------
+# ---------------------------------start here-----------------------------------------------------
 class enc_embedding_scamp(nn.Module):
     def __init__(self, d_model, patch_len, stride, freq, max_motifs=5, max_discords=5):
         super(enc_embedding_scamp, self).__init__()
@@ -507,9 +614,9 @@ class enc_embedding_scamp(nn.Module):
             profile, indices = pyscamp.selfjoin(time_series, m=self.motif_window)
 
             sorted_indices = np.argsort(profile)
-            motif_indices = sorted_indices[:self.max_motifs]
+            motif_indices = sorted_indices[: self.max_motifs]
 
-            discord_indices = sorted_indices[-self.max_discords:]
+            discord_indices = sorted_indices[-self.max_discords :]
 
             combined_indices = sorted(list(motif_indices) + list(discord_indices))
 
@@ -549,8 +656,9 @@ class enc_embedding_scamp(nn.Module):
             pad_length = self.motif_window - len(patch)
             padded_patch = torch.nn.functional.pad(patch, (0, pad_length))
         else:
-            padded_patch = patch[:self.motif_window]
+            padded_patch = patch[: self.motif_window]
         return padded_patch
+
 
 class GradientBasedWindowing:
     def __init__(self, gradient_threshold, min_window_size):
@@ -571,9 +679,14 @@ class GradientBasedWindowing:
                     current_patch.append(data[i, feature, j].item())
 
                     if j < seq_len - 1:
-                        if grad_diff[j].item() > self.gradient_threshold and len(current_patch) >= self.min_window_size:
+                        if (
+                            grad_diff[j].item() > self.gradient_threshold
+                            and len(current_patch) >= self.min_window_size
+                        ):
                             # Create a new patch if the gradient threshold is exceeded
-                            sample_patches.append(torch.tensor(current_patch).unsqueeze(0))  # Shape: [1, patch_len]
+                            sample_patches.append(
+                                torch.tensor(current_patch).unsqueeze(0)
+                            )  # Shape: [1, patch_len]
                             current_patch = []  # Reset current patch
 
                 # Append any remaining values in the current patch
@@ -581,7 +694,7 @@ class GradientBasedWindowing:
                     sample_patches.append(torch.tensor(current_patch).unsqueeze(0))
 
             patches_list.append(sample_patches)
-        
+
         return patches_list  # Each sample in batch has a list of feature patches
 
 
@@ -590,9 +703,13 @@ class PatchEmbedding(nn.Module):
         super(PatchEmbedding, self).__init__()
         self.d_model = d_model
         self.device = device
-        self.conv1d = nn.Conv1d(1, d_model, kernel_size=3, stride=1, padding=0).to(device)
+        self.conv1d = nn.Conv1d(1, d_model, kernel_size=3, stride=1, padding=0).to(
+            device
+        )
         self.pool = nn.AdaptiveAvgPool1d(1).to(device)
-        self.linear = nn.Linear(2, d_model).to(device)  # Linear layer for very short patches
+        self.linear = nn.Linear(2, d_model).to(
+            device
+        )  # Linear layer for very short patches
 
     def forward(self, patches):
         max_patch_len = max(patch.size(1) for patch in patches)
@@ -607,12 +724,16 @@ class PatchEmbedding(nn.Module):
                 patch = nn.functional.pad(patch, (0, pad_amount))
 
             # Reshape to [1, 1, patch_length] for conv1d
-            patch = patch.unsqueeze(0).unsqueeze(0).to(self.device)  # Shape: [1, 1, patch_len]
+            patch = (
+                patch.unsqueeze(0).unsqueeze(0).to(self.device)
+            )  # Shape: [1, 1, patch_len]
 
             # Apply conv1d if patch length >= kernel size, otherwise use linear or zero embedding
             if patch.size(2) >= 3:
                 patch_embedding = self.conv1d(patch)
-                patch_embedding = self.pool(patch_embedding).squeeze(-1)  # Pool to [1, d_model]
+                patch_embedding = self.pool(patch_embedding).squeeze(
+                    -1
+                )  # Pool to [1, d_model]
             elif patch.size(2) == 2:
                 patch_embedding = self.linear(patch.squeeze(0))
             else:
@@ -629,16 +750,18 @@ class enc_embedding_dynamic(nn.Module):
         gradient_threshold = 0.2
         min_window_size = 10
         self.d_model = d_model
-        self.device = 'cuda:0'
+        self.device = "cuda:0"
         self.position_embedding = PositionalEmbeddingPatches(d_model=self.d_model)
-        self.temporal_embedding = TimeFeatureEmbeddingPatches(d_model=self.d_model, freq=freq)
+        self.temporal_embedding = TimeFeatureEmbeddingPatches(
+            d_model=self.d_model, freq=freq
+        )
         self.patch_embedding = PatchEmbedding(d_model=self.d_model, device=self.device)
         self.windowing = GradientBasedWindowing(gradient_threshold, min_window_size)
 
     def forward(self, x, x_mark):
         pe = self.position_embedding(x)
         te = self.temporal_embedding(x_mark)
-        x = x.permute(0,2,1) + pe + te
+        x = x.permute(0, 2, 1) + pe + te
 
         batch_size, num_features, _ = x.shape
         all_embedded_samples = []
@@ -651,35 +774,50 @@ class enc_embedding_dynamic(nn.Module):
         for feature_idx in range(num_features):
             for sample_idx in range(batch_size):
                 # Get gradient-based patches for each feature in the batch
-                patches = self.windowing.forward(x[sample_idx:sample_idx + 1, feature_idx:feature_idx + 1, :])
-                feature_patches_lists[feature_idx].append(patches[0])  # Append patches for this feature
-                global_max_patches = max(global_max_patches, len(patches[0]))  # Update global max_patches
+                patches = self.windowing.forward(
+                    x[sample_idx : sample_idx + 1, feature_idx : feature_idx + 1, :]
+                )
+                feature_patches_lists[feature_idx].append(
+                    patches[0]
+                )  # Append patches for this feature
+                global_max_patches = max(
+                    global_max_patches, len(patches[0])
+                )  # Update global max_patches
 
         # Second pass: Embed and pad patches to global_max_patches
         for feature_idx in range(num_features):
             embedded_feature_samples = []
             for patches in feature_patches_lists[feature_idx]:
-                embedded_patches = self.patch_embedding(patches)  # Shape: [num_patches, d_model]
+                embedded_patches = self.patch_embedding(
+                    patches
+                )  # Shape: [num_patches, d_model]
 
                 # Pad to global_max_patches if necessary
                 if embedded_patches.size(0) < global_max_patches:
-                    padding = torch.zeros(global_max_patches - embedded_patches.size(0), self.d_model,
-                                          device=self.device)
-                    embedded_patches = torch.cat((embedded_patches, padding),
-                                                 dim=0)  # Shape: [global_max_patches, d_model]
+                    padding = torch.zeros(
+                        global_max_patches - embedded_patches.size(0),
+                        self.d_model,
+                        device=self.device,
+                    )
+                    embedded_patches = torch.cat(
+                        (embedded_patches, padding), dim=0
+                    )  # Shape: [global_max_patches, d_model]
 
                 embedded_feature_samples.append(embedded_patches)
 
             # Stack all embedded patches for this feature across batch
             embedded_feature_tensor = torch.stack(
-                embedded_feature_samples)  # Shape: [batch_size, global_max_patches, d_model]
+                embedded_feature_samples
+            )  # Shape: [batch_size, global_max_patches, d_model]
             all_embedded_samples.append(embedded_feature_tensor)
 
         # Stack all features into final tensor shape
-        final_output = torch.stack(all_embedded_samples,
-                                   dim=1)  # Shape: [batch_size, num_features, global_max_patches, d_model]
+        final_output = torch.stack(
+            all_embedded_samples, dim=1
+        )  # Shape: [batch_size, num_features, global_max_patches, d_model]
         return final_output
-    
+
+
 class encembed_scamp(nn.Module):
     def __init__(self, d_model, patch_len, stride, freq, k_neighbors=3):
         super(encembed_scamp, self).__init__()
@@ -699,7 +837,9 @@ class encembed_scamp(nn.Module):
             return [result[1] for result in knn_results[:k_neighbors]]
 
         # Parallelize KNN computation across the batch
-        x_cpu = x[:, :, 0].cpu().detach().numpy()  # Move data to CPU for KNN computation
+        x_cpu = (
+            x[:, :, 0].cpu().detach().numpy()
+        )  # Move data to CPU for KNN computation
         neighbor_indices_batch = [
             compute_knn_for_sequence(x_cpu[b], self.patch_len, self.k_neighbors)
             for b in range(batch_size)
@@ -724,13 +864,17 @@ class encembed_scamp(nn.Module):
                 # Pad if the patch is smaller than patch_len
                 if patch.size(0) < self.patch_len:
                     pad_len = self.patch_len - patch.size(0)
-                    patch = torch.nn.functional.pad(patch, (0, 0, 0, pad_len))  # Pad along seq_len dimension
+                    patch = torch.nn.functional.pad(
+                        patch, (0, 0, 0, pad_len)
+                    )  # Pad along seq_len dimension
 
                 selected_patches.append(patch)
 
         # Combine patches into a single tensor
         num_patches = len(selected_patches) // batch_size
-        selected_patches = torch.stack(selected_patches, dim=0).view(batch_size, num_patches, self.patch_len, channels)
+        selected_patches = torch.stack(selected_patches, dim=0).view(
+            batch_size, num_patches, self.patch_len, channels
+        )
 
         # Permute for embedding layer input: [batch_size, channels, num_patches, patch_len]
         selected_patches = selected_patches.permute(0, 3, 1, 2)
@@ -738,6 +882,7 @@ class encembed_scamp(nn.Module):
         # Linear embedding transformation
         x_embed = self.linear_x_embed(selected_patches)
         return x_embed
+
 
 class enc_embedding(nn.Module):
     def __init__(self, d_model, patch_len, stride, freq):
@@ -754,6 +899,7 @@ class enc_embedding(nn.Module):
         x_embed = self.linear_x_embed(x)
         return x_embed
 
+
 import torch
 import torch.nn as nn
 import math
@@ -767,29 +913,37 @@ class PositionalEmbedding(nn.Module):
         pe.require_grad = False
 
         position = torch.arange(0, max_len).float().unsqueeze(1)
-        div_term = (torch.arange(0, d_model, 2).float()
-                    * -(math.log(10000.0) / d_model)).exp()
+        div_term = (
+            torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)
+        ).exp()
 
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
 
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
-        return self.pe[:, :x.size(1)]
+        return self.pe[:, : x.size(1)]
 
 
 class TokenEmbedding(nn.Module):
     def __init__(self, c_in, d_model):
         super(TokenEmbedding, self).__init__()
-        padding = 1 if torch.__version__ >= '1.5.0' else 2
-        self.tokenConv = nn.Conv1d(in_channels=c_in, out_channels=d_model,
-                                   kernel_size=3, padding=padding, padding_mode='circular', bias=False)
+        padding = 1 if torch.__version__ >= "1.5.0" else 2
+        self.tokenConv = nn.Conv1d(
+            in_channels=c_in,
+            out_channels=d_model,
+            kernel_size=3,
+            padding=padding,
+            padding_mode="circular",
+            bias=False,
+        )
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_in', nonlinearity='leaky_relu')
+                    m.weight, mode="fan_in", nonlinearity="leaky_relu"
+                )
 
     def forward(self, x):
         x = self.tokenConv(x.permute(0, 2, 1)).transpose(1, 2)
@@ -804,8 +958,9 @@ class FixedEmbedding(nn.Module):
         w.require_grad = False
 
         position = torch.arange(0, c_in).float().unsqueeze(1)
-        div_term = (torch.arange(0, d_model, 2).float()
-                    * -(math.log(10000.0) / d_model)).exp()
+        div_term = (
+            torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model)
+        ).exp()
         w[:, 0::2] = torch.sin(position * div_term)
         w[:, 1::2] = torch.cos(position * div_term)
 
@@ -817,7 +972,7 @@ class FixedEmbedding(nn.Module):
 
 
 class TemporalEmbedding(nn.Module):
-    def __init__(self, d_model, embed_type='fixed', freq='h'):
+    def __init__(self, d_model, embed_type="fixed", freq="h"):
         super(TemporalEmbedding, self).__init__()
 
         minute_size = 4
@@ -826,8 +981,8 @@ class TemporalEmbedding(nn.Module):
         day_size = 32
         month_size = 13
 
-        Embed = FixedEmbedding if embed_type == 'fixed' else nn.Embedding
-        if freq == 't':
+        Embed = FixedEmbedding if embed_type == "fixed" else nn.Embedding
+        if freq == "t":
             self.minute_embed = Embed(minute_size, d_model)
         self.hour_embed = Embed(hour_size, d_model)
         self.weekday_embed = Embed(weekday_size, d_model)
@@ -836,8 +991,9 @@ class TemporalEmbedding(nn.Module):
 
     def forward(self, x):
         x = x.long()
-        minute_x = self.minute_embed(x[:, :, 4]) if hasattr(
-            self, 'minute_embed') else 0.
+        minute_x = (
+            self.minute_embed(x[:, :, 4]) if hasattr(self, "minute_embed") else 0.0
+        )
         hour_x = self.hour_embed(x[:, :, 3])
         weekday_x = self.weekday_embed(x[:, :, 2])
         day_x = self.day_embed(x[:, :, 1])
@@ -847,10 +1003,9 @@ class TemporalEmbedding(nn.Module):
 
 
 class TimeFeatureEmbedding(nn.Module):
-    def __init__(self, d_model, embed_type='timeF', freq='h'):
+    def __init__(self, d_model, embed_type="timeF", freq="h"):
         super(TimeFeatureEmbedding, self).__init__()
-        freq_map = {'h': 4, 't': 5, 's': 6,
-                    'm': 1, 'a': 1, 'w': 2, 'd': 3, 'b': 3}
+        freq_map = {"h": 4, "t": 5, "s": 6, "m": 1, "a": 1, "w": 2, "d": 3, "b": 3}
         d_inp = freq_map[freq]
         self.embed = nn.Linear(d_inp, d_model, bias=False)
 
@@ -858,17 +1013,17 @@ class TimeFeatureEmbedding(nn.Module):
         return self.embed(x)
 
 
-
-
 class DataEmbedding_wo_pos(nn.Module):
-    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+    def __init__(self, c_in, d_model, embed_type="fixed", freq="h", dropout=0.1):
         super(DataEmbedding_wo_pos, self).__init__()
 
         self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
         self.position_embedding = PositionalEmbedding(d_model=d_model)
-        self.temporal_embedding = TemporalEmbedding(d_model=d_model, embed_type=embed_type,
-                                                    freq=freq) if embed_type != 'timeF' else TimeFeatureEmbedding(
-            d_model=d_model, embed_type=embed_type, freq=freq)
+        self.temporal_embedding = (
+            TemporalEmbedding(d_model=d_model, embed_type=embed_type, freq=freq)
+            if embed_type != "timeF"
+            else TimeFeatureEmbedding(d_model=d_model, embed_type=embed_type, freq=freq)
+        )
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x, x_mark):
@@ -879,8 +1034,8 @@ class DataEmbedding_wo_pos(nn.Module):
         else:
             x = self.value_embedding(x) + self.temporal_embedding(x_mark)
         return self.dropout(x)
-    
-    
+
+
 class PatchEmbed(nn.Module):
     def __init__(self, args, num_p=1, d_model=None):
         super(PatchEmbed, self).__init__()
@@ -889,8 +1044,7 @@ class PatchEmbed(nn.Module):
         self.d_model = args.d_model if d_model is None else d_model
 
         self.proj = nn.Sequential(
-            nn.Linear(self.patch, self.d_model, False),
-            nn.Dropout(args.dropout)
+            nn.Linear(self.patch, self.d_model, False), nn.Dropout(args.dropout)
         )
 
     def forward(self, x, x_mark):

@@ -70,14 +70,14 @@ class WeekOfYear(TimeFeature):
     """Week of year encoded as value between [-0.5, 0.5]"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        return (index.strftime('%U').astype(int) - 1) / 52.0 - 0.5
+        return (index.strftime("%U").astype(int) - 1) / 52.0 - 0.5
 
 
 class WeekOfMonth(TimeFeature):
     """Week of month encoded as value between [-0.5, 0.5]"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        return (((index.day - 1) // 7) + 1) /4 - 0.5
+        return (((index.day - 1) // 7) + 1) / 4 - 0.5
 
 
 def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
@@ -98,7 +98,14 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
         offsets.BusinessDay: [DayOfWeek, DayOfMonth, DayOfYear],
         offsets.Hour: [HourOfDay, DayOfWeek, DayOfMonth, DayOfYear],
         offsets.Minute: [MinuteOfHour, HourOfDay, DayOfWeek, DayOfMonth, DayOfYear],
-        offsets.Second: [SecondOfMinute, MinuteOfHour, HourOfDay, DayOfWeek, DayOfMonth, DayOfYear],
+        offsets.Second: [
+            SecondOfMinute,
+            MinuteOfHour,
+            HourOfDay,
+            DayOfWeek,
+            DayOfMonth,
+            DayOfYear,
+        ],
     }
 
     offset = to_offset(freq_str)
@@ -124,6 +131,6 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
     raise RuntimeError(supported_freq_msg)
 
 
-def time_features(dates, freq='h'):
+def time_features(dates, freq="h"):
     stamp = np.vstack([feat(dates) for feat in time_features_from_frequency_str(freq)])
     return stamp

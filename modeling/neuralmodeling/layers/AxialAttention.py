@@ -2,18 +2,24 @@ import torch
 import torch.nn as nn
 from torch.nn import Softmax
 
+
 class RowAttention(nn.Module):
     def __init__(self, in_dim, q_k_dim):
         super(RowAttention, self).__init__()
         self.in_dim = in_dim
         self.q_k_dim = q_k_dim
 
-        self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1)
-        self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1)
-        self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=self.in_dim, kernel_size=1)
+        self.query_conv = nn.Conv2d(
+            in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1
+        )
+        self.key_conv = nn.Conv2d(
+            in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1
+        )
+        self.value_conv = nn.Conv2d(
+            in_channels=in_dim, out_channels=self.in_dim, kernel_size=1
+        )
         self.softmax = Softmax(dim=2)
         self.gamma = nn.Parameter(torch.zeros(1))
-
 
     def forward(self, x):
         b, _, h, w = x.size()
@@ -39,9 +45,15 @@ class ColAttention(nn.Module):
         self.in_dim = in_dim
         self.q_k_dim = q_k_dim
 
-        self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1)
-        self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1)
-        self.value_conv = nn.Conv2d(in_channels=in_dim, out_channels=self.in_dim, kernel_size=1)
+        self.query_conv = nn.Conv2d(
+            in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1
+        )
+        self.key_conv = nn.Conv2d(
+            in_channels=in_dim, out_channels=self.q_k_dim, kernel_size=1
+        )
+        self.value_conv = nn.Conv2d(
+            in_channels=in_dim, out_channels=self.in_dim, kernel_size=1
+        )
         self.softmax = Softmax(dim=2)
         self.gamma = nn.Parameter(torch.zeros(1))
 
@@ -51,7 +63,9 @@ class ColAttention(nn.Module):
         K = self.key_conv(x)
         V = self.value_conv(x)
 
-        Q = Q.permute(0, 3, 1, 2).contiguous().view(b * w, -1, h).permute(0, 2, 1)  # size = (b*w,h,c2)
+        Q = (
+            Q.permute(0, 3, 1, 2).contiguous().view(b * w, -1, h).permute(0, 2, 1)
+        )  # size = (b*w,h,c2)
         K = K.permute(0, 3, 1, 2).contiguous().view(b * w, -1, h)  # size = (b*w,c2,h)
         V = V.permute(0, 3, 1, 2).contiguous().view(b * w, -1, h)  # size = (b*w,c1,h)
 

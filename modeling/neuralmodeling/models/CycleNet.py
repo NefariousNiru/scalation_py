@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class RecurrentCycle(torch.nn.Module):
     # Thanks for the contribution of wayhoww.
     # The new implementation uses index arithmetic with modulo to directly gather cyclic data in a single operation,
@@ -11,10 +12,14 @@ class RecurrentCycle(torch.nn.Module):
         super(RecurrentCycle, self).__init__()
         self.cycle_len = cycle_len
         self.channel_size = channel_size
-        self.data = torch.nn.Parameter(torch.zeros(cycle_len, channel_size), requires_grad=True)
+        self.data = torch.nn.Parameter(
+            torch.zeros(cycle_len, channel_size), requires_grad=True
+        )
 
     def forward(self, index, length):
-        gather_index = (index.view(-1, 1) + torch.arange(length, device=index.device).view(1, -1)) % self.cycle_len    
+        gather_index = (
+            index.view(-1, 1) + torch.arange(length, device=index.device).view(1, -1)
+        ) % self.cycle_len
         return self.data[gather_index]
 
 
@@ -30,19 +35,33 @@ class Model(nn.Module):
         self.d_model = configs.d_model
         self.use_revin = configs.revin
 
-        self.cycleQueue = RecurrentCycle(cycle_len=self.cycle_len, channel_size=self.enc_in)
+        self.cycleQueue = RecurrentCycle(
+            cycle_len=self.cycle_len, channel_size=self.enc_in
+        )
 
-        assert self.model_type in ['linear', 'mlp']
-        if self.model_type == 'linear':
+        assert self.model_type in ["linear", "mlp"]
+        if self.model_type == "linear":
             self.model = nn.Linear(self.seq_len, self.pred_len)
-        elif self.model_type == 'mlp':
+        elif self.model_type == "mlp":
             self.model = nn.Sequential(
                 nn.Linear(self.seq_len, self.d_model),
                 nn.ReLU(),
-                nn.Linear(self.d_model, self.pred_len)
+                nn.Linear(self.d_model, self.pred_len),
             )
 
-    def forward(self, indices_x, indices_y, x_enc, x_mark_enc, dec_inp, x_dec, x_mark_dec, cycle_index, mode, use_tf=False):
+    def forward(
+        self,
+        indices_x,
+        indices_y,
+        x_enc,
+        x_mark_enc,
+        dec_inp,
+        x_dec,
+        x_mark_dec,
+        cycle_index,
+        mode,
+        use_tf=False,
+    ):
         # x: (batch_size, seq_len, enc_in), cycle_index: (batch_size,)
 
         # instance norm
@@ -59,7 +78,9 @@ class Model(nn.Module):
         y = self.model(x.permute(0, 2, 1)).permute(0, 2, 1)
 
         # add back the cycle of the output data
-        y = y + self.cycleQueue((cycle_index + self.seq_len) % self.cycle_len, self.pred_len)
+        y = y + self.cycleQueue(
+            (cycle_index + self.seq_len) % self.cycle_len, self.pred_len
+        )
 
         # instance denorm
         if self.use_revin:

@@ -3,14 +3,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 from modeling.neuralmodeling.layers.Invertible import RevIN
 
+
 class Model(nn.Module):
     def __init__(self, configs):
         super(Model, self).__init__()
 
-        self.Linear = nn.ModuleList([
-            nn.Linear(configs.seq_len, configs.pred_len) for _ in range(configs.channel)
-        ]) if configs.individual else nn.Linear(configs.seq_len, configs.pred_len)
-        
+        self.Linear = (
+            nn.ModuleList(
+                [
+                    nn.Linear(configs.seq_len, configs.pred_len)
+                    for _ in range(configs.channel)
+                ]
+            )
+            if configs.individual
+            else nn.Linear(configs.seq_len, configs.pred_len)
+        )
+
         self.dropout = nn.Dropout(configs.dropout)
         self.rev = RevIN(configs.channel) if configs.rev else None
         self.individual = configs.individual
@@ -22,7 +30,7 @@ class Model(nn.Module):
         x = x_enc
         y = x_dec
         # x: [B, L, D]
-        x = self.rev(x, 'norm') if self.rev else x
+        x = self.rev(x, "norm") if self.rev else x
         x = self.dropout(x)
         if self.individual:
             pred = torch.zeros_like(y)
@@ -30,7 +38,7 @@ class Model(nn.Module):
                 pred[:, :, idx] = proj(x[:, :, idx])
         else:
             pred = self.Linear(x.transpose(1, 2)).transpose(1, 2)
-        pred = self.rev(pred, 'denorm') if self.rev else pred
+        pred = self.rev(pred, "denorm") if self.rev else pred
 
-        #return pred, self.forward_loss(pred, y)
+        # return pred, self.forward_loss(pred, y)
         return pred, self.forward_loss(pred, y)

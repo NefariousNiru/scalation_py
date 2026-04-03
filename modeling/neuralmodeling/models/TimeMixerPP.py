@@ -6,8 +6,14 @@ import torch.fft
 
 from modeling.neuralmodeling.layers.AxialAttention import RowAttention, ColAttention
 from modeling.neuralmodeling.layers.Embed import DataEmbedding_wo_pos
-from modeling.neuralmodeling.layers.Conv_Blocks import Inception_Block_V1, Inception_Trans_Block_V1
-from modeling.neuralmodeling.layers.SelfAttention_Family import FullAttention, AttentionLayer
+from modeling.neuralmodeling.layers.Conv_Blocks import (
+    Inception_Block_V1,
+    Inception_Trans_Block_V1,
+)
+from modeling.neuralmodeling.layers.SelfAttention_Family import (
+    FullAttention,
+    AttentionLayer,
+)
 from modeling.neuralmodeling.layers.StandardNorm import Normalize
 
 
@@ -30,11 +36,17 @@ class MultiScaleSeasonCross(nn.Module):
     def __init__(self, configs):
         super(MultiScaleSeasonCross, self).__init__()
         self.cross_conv_season = nn.Sequential(
-            Inception_Block_V1(configs.d_model, configs.d_ff,
-                               num_kernels=configs.num_kernels, stride=(configs.down_sampling_window, 1)),
+            Inception_Block_V1(
+                configs.d_model,
+                configs.d_ff,
+                num_kernels=configs.num_kernels,
+                stride=(configs.down_sampling_window, 1),
+            ),
             nn.GELU(),
-            Inception_Block_V1(configs.d_ff, configs.d_model,
-                               num_kernels=configs.num_kernels))
+            Inception_Block_V1(
+                configs.d_ff, configs.d_model, num_kernels=configs.num_kernels
+            ),
+        )
 
     def forward(self, season_list):
         B, N, _, _ = season_list[0].size()
@@ -57,13 +69,17 @@ class MultiScaleTrendCross(nn.Module):
     def __init__(self, configs):
         super(MultiScaleTrendCross, self).__init__()
 
-        self.cross_trans_conv_season = Inception_Trans_Block_V1(configs.d_model, configs.d_ff,
-                                                                num_kernels=configs.num_kernels,
-                                                                stride=(configs.down_sampling_window, 1))
+        self.cross_trans_conv_season = Inception_Trans_Block_V1(
+            configs.d_model,
+            configs.d_ff,
+            num_kernels=configs.num_kernels,
+            stride=(configs.down_sampling_window, 1),
+        )
         self.cross_trans_conv_season_restore = nn.Sequential(
             nn.GELU(),
-            Inception_Block_V1(configs.d_ff, configs.d_model,
-                               num_kernels=configs.num_kernels)
+            Inception_Block_V1(
+                configs.d_ff, configs.d_model, num_kernels=configs.num_kernels
+            ),
         )
 
     def forward(self, trend_list):
@@ -76,7 +92,9 @@ class MultiScaleTrendCross(nn.Module):
         out_trend_list.append(out_low.permute(0, 2, 3, 1).reshape(B, -1, N))
 
         for i in range(len(trend_list) - 1):
-            out_high_res = self.cross_trans_conv_season(out_low, output_size=out_high.size())
+            out_high_res = self.cross_trans_conv_season(
+                out_low, output_size=out_high.size()
+            )
             out_high_res = self.cross_trans_conv_season_restore(out_high_res)
             out_high = out_high + out_high_res
             out_low = out_high
@@ -140,7 +158,9 @@ class MixerBlock(nn.Module):
     def time_imaging(self, x, period):
         B, T, N = x.size()
         out, length = self.__conv_padding(x, period)
-        out = out.reshape(B, length // period, period, N).permute(0, 3, 1, 2).contiguous()
+        out = (
+            out.reshape(B, length // period, period, N).permute(0, 3, 1, 2).contiguous()
+        )
         return out
 
     def dual_axis_attn(self, out):
@@ -152,7 +172,9 @@ class MixerBlock(nn.Module):
         out_season_list = self.multi_scale_season_conv(season_list)
         out_trend_list = self.multi_scale_trend_conv(trend_list)
         out_list = []
-        for out_season, out_trend, length in zip(out_season_list, out_trend_list, length_list):
+        for out_season, out_trend, length in zip(
+            out_season_list, out_trend_list, length_list
+        ):
             out = out_season + out_trend
             out_list.append(out[:, :length, :])
         return out_list
@@ -161,7 +183,11 @@ class MixerBlock(nn.Module):
         B, T, N = x.size()
 
         if T % (period * down_sampling_window) != 0:
-            length = ((T // (period * down_sampling_window)) + 1) * period * down_sampling_window
+            length = (
+                ((T // (period * down_sampling_window)) + 1)
+                * period
+                * down_sampling_window
+            )
             padding = torch.zeros([B, (length - T), N]).to(x.device)
             out = torch.cat([x, padding], dim=1)
         else:
@@ -172,8 +198,7 @@ class MixerBlock(nn.Module):
     def multi_reso_mixing(self, period_weight, x, res):
         B, T, N = x.size()
         period_weight = F.softmax(period_weight, dim=1)
-        period_weight = period_weight.unsqueeze(
-            1).unsqueeze(1).repeat(1, T, N, 1)
+        period_weight = period_weight.unsqueeze(1).unsqueeze(1).repeat(1, T, N, 1)
         res = torch.sum(res * period_weight, -1)
         # residual connection
         res = res + x
@@ -190,20 +215,25 @@ class Model(nn.Module):
         self.pred_len = configs.pred_len
         self.down_sampling_window = configs.down_sampling_window
         self.channel_independence = configs.channel_independence
-        self.encoder_model = nn.ModuleList([MixerBlock(configs)
-                                            for _ in range(configs.e_layers)])
+        self.encoder_model = nn.ModuleList(
+            [MixerBlock(configs) for _ in range(configs.e_layers)]
+        )
 
         if self.channel_independence:
-            self.enc_embedding = DataEmbedding_wo_pos(1, configs.d_model, configs.embed, configs.freq,
-                                                      configs.dropout)
+            self.enc_embedding = DataEmbedding_wo_pos(
+                1, configs.d_model, configs.embed, configs.freq, configs.dropout
+            )
         else:
-            self.enc_embedding = DataEmbedding_wo_pos(self.configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                                      configs.dropout)
+            self.enc_embedding = DataEmbedding_wo_pos(
+                self.configs.enc_in,
+                configs.d_model,
+                configs.embed,
+                configs.freq,
+                configs.dropout,
+            )
         self.revin_layers = torch.nn.ModuleList(
             [
-                Normalize(self.configs.enc_in,
-                          affine=True, subtract_last=False
-                          )
+                Normalize(self.configs.enc_in, affine=True, subtract_last=False)
                 for i in range(configs.down_sampling_layers + 1)
             ]
         )
@@ -211,45 +241,64 @@ class Model(nn.Module):
         self.layer = configs.e_layers
 
         if self.configs.channel_mixing:
-            d_time_model = configs.seq_len // (configs.down_sampling_window ** configs.down_sampling_layers)
-            self.channel_mixing_attention = AttentionLayer(FullAttention(False, attention_dropout=self.configs.dropout,
-                                                                         output_attention=self.configs.output_attention),
-                                                           d_time_model, self.configs.n_heads)
+            d_time_model = configs.seq_len // (
+                configs.down_sampling_window**configs.down_sampling_layers
+            )
+            self.channel_mixing_attention = AttentionLayer(
+                FullAttention(
+                    False,
+                    attention_dropout=self.configs.dropout,
+                    output_attention=self.configs.output_attention,
+                ),
+                d_time_model,
+                self.configs.n_heads,
+            )
 
-        if self.configs.down_sampling_method == 'max':
-            self.down_pool = torch.nn.MaxPool1d(self.configs.down_sampling_window, return_indices=False)
-        elif self.configs.down_sampling_method == 'avg':
+        if self.configs.down_sampling_method == "max":
+            self.down_pool = torch.nn.MaxPool1d(
+                self.configs.down_sampling_window, return_indices=False
+            )
+        elif self.configs.down_sampling_method == "avg":
             self.down_pool = torch.nn.AvgPool1d(self.configs.down_sampling_window)
-        elif self.configs.down_sampling_method == 'conv':
-            padding = 1 if torch.__version__ >= '1.5.0' else 2
+        elif self.configs.down_sampling_method == "conv":
+            padding = 1 if torch.__version__ >= "1.5.0" else 2
             if self.channel_independence:
                 in_channels = 1
             else:
                 in_channels = self.configs.enc_in
-            self.down_pool = nn.Conv1d(in_channels=in_channels, out_channels=in_channels,
-                                       kernel_size=3, padding=padding,
-                                       stride=self.configs.down_sampling_window,
-                                       padding_mode='circular',
-                                       bias=False)
+            self.down_pool = nn.Conv1d(
+                in_channels=in_channels,
+                out_channels=in_channels,
+                kernel_size=3,
+                padding=padding,
+                stride=self.configs.down_sampling_window,
+                padding_mode="circular",
+                bias=False,
+            )
         else:
-            raise ValueError('Downsampling method is error,only supporting the max, avg, conv1D')
+            raise ValueError(
+                "Downsampling method is error,only supporting the max, avg, conv1D"
+            )
 
-        if self.task_name == 'long_term_forecast' or self.task_name == 'short_term_forecast':
+        if (
+            self.task_name == "long_term_forecast"
+            or self.task_name == "short_term_forecast"
+        ):
             self.predict_layers = torch.nn.ModuleList(
                 [
                     torch.nn.Linear(
-                        self.seq_len // (self.down_sampling_window ** i),
-                        self.pred_len // (self.down_sampling_window ** i),
+                        self.seq_len // (self.down_sampling_window**i),
+                        self.pred_len // (self.down_sampling_window**i),
                     )
                     for i in range(self.configs.down_sampling_layers + 1)
                 ]
             )
             if self.channel_independence == 1:
-                self.projection_layer = nn.Linear(
-                    configs.d_model, 1, bias=True)
+                self.projection_layer = nn.Linear(configs.d_model, 1, bias=True)
             else:
                 self.projection_layer = nn.Linear(
-                    configs.d_model, configs.c_out, bias=True)
+                    configs.d_model, configs.c_out, bias=True
+                )
 
     def __multi_scale_process_inputs(self, x_enc, x_mark_enc):
         # B,T,C -> B,C,T
@@ -263,21 +312,37 @@ class Model(nn.Module):
         x_mark_sampling_list.append(x_mark_enc)
 
         for i in range(self.configs.down_sampling_layers):
-            if self.configs.down_sampling_method == 'conv' and i == 0 and self.channel_independence:
-                x_enc_ori = x_enc_ori.contiguous().reshape(B * N, T, 1).permute(0, 2, 1).contiguous()
+            if (
+                self.configs.down_sampling_method == "conv"
+                and i == 0
+                and self.channel_independence
+            ):
+                x_enc_ori = (
+                    x_enc_ori.contiguous()
+                    .reshape(B * N, T, 1)
+                    .permute(0, 2, 1)
+                    .contiguous()
+                )
             x_enc_sampling = self.down_pool(x_enc_ori)
 
-            if self.configs.down_sampling_method == 'conv':
+            if self.configs.down_sampling_method == "conv":
                 x_enc_sampling_list.append(
-                    x_enc_sampling.reshape(B, N, T // (self.down_sampling_window ** (i + 1))).permute(0, 2, 1))
+                    x_enc_sampling.reshape(
+                        B, N, T // (self.down_sampling_window ** (i + 1))
+                    ).permute(0, 2, 1)
+                )
             else:
                 x_enc_sampling_list.append(x_enc_sampling.permute(0, 2, 1))
 
             x_enc_ori = x_enc_sampling
 
             if x_mark_enc_mark_ori is not None:
-                x_mark_sampling_list.append(x_mark_enc_mark_ori[:, ::self.configs.down_sampling_window, :])
-                x_mark_enc_mark_ori = x_mark_enc_mark_ori[:, ::self.configs.down_sampling_window, :]
+                x_mark_sampling_list.append(
+                    x_mark_enc_mark_ori[:, :: self.configs.down_sampling_window, :]
+                )
+                x_mark_enc_mark_ori = x_mark_enc_mark_ori[
+                    :, :: self.configs.down_sampling_window, :
+                ]
 
         x_enc = x_enc_sampling_list
         if x_mark_enc_mark_ori is not None:
@@ -297,16 +362,19 @@ class Model(nn.Module):
             for i, x, x_mark in zip(range(len(x_enc)), x_enc, x_mark_enc):
                 B, T, N = x.size()
 
-                x = self.revin_layers[i](x, 'norm')
+                x = self.revin_layers[i](x, "norm")
                 if self.channel_independence == 1:
                     x = x.permute(0, 2, 1).contiguous().reshape(B * N, T, 1)
                     x_mark = x_mark.repeat(N, 1, 1)
                 x_list.append(x)
                 x_mark_list.append(x_mark)
         else:
-            for i, x in zip(range(len(x_enc)), x_enc, ):
+            for i, x in zip(
+                range(len(x_enc)),
+                x_enc,
+            ):
                 B, T, N = x.size()
-                x = self.revin_layers[i](x, 'norm')
+                x = self.revin_layers[i](x, "norm")
                 if self.channel_independence == 1:
                     x = x.permute(0, 2, 1).contiguous().reshape(B * N, T, 1)
                 x_list.append(x)
@@ -315,8 +383,9 @@ class Model(nn.Module):
             _, T, D = x_list[-1].size()
 
             coarse_scale_enc_out = x_list[-1].reshape(B, N, T * D)
-            coarse_scale_enc_out, _ = self.channel_mixing_attention(coarse_scale_enc_out, coarse_scale_enc_out,
-                                                                    coarse_scale_enc_out, None)
+            coarse_scale_enc_out, _ = self.channel_mixing_attention(
+                coarse_scale_enc_out, coarse_scale_enc_out, coarse_scale_enc_out, None
+            )
             x_list[-1] = coarse_scale_enc_out.reshape(B * N, T, D) + x_list[-1]
 
         enc_out_list = []
@@ -335,11 +404,14 @@ class Model(nn.Module):
         dec_out_list = []
         for i, enc_out in zip(range(len(x_list)), enc_out_list):
             dec_out = self.predict_layers[i](enc_out.permute(0, 2, 1)).permute(
-                0, 2, 1)  # align temporal dimension
+                0, 2, 1
+            )  # align temporal dimension
             dec_out = self.projection_layer(dec_out)
-            dec_out = dec_out.reshape(B, self.configs.c_out, -1).permute(0, 2, 1).contiguous()
+            dec_out = (
+                dec_out.reshape(B, self.configs.c_out, -1).permute(0, 2, 1).contiguous()
+            )
             dec_out_list.append(dec_out)
-        dec_out = self.revin_layers[0](dec_out_list[0], 'denorm')
+        dec_out = self.revin_layers[0](dec_out_list[0], "denorm")
         return dec_out
 
     def classification(self, x_enc, x_mark_enc):
@@ -367,9 +439,12 @@ class Model(nn.Module):
         x_enc, _ = self.__multi_scale_process_inputs(x_enc, None)
         x_list = []
 
-        for i, x in zip(range(len(x_enc)), x_enc, ):
+        for i, x in zip(
+            range(len(x_enc)),
+            x_enc,
+        ):
             B, T, N = x.size()
-            x = self.revin_layers[i](x, 'norm')
+            x = self.revin_layers[i](x, "norm")
             if self.channel_independence == 1:
                 x = x.permute(0, 2, 1).contiguous().reshape(B * N, T, 1)
             x_list.append(x)
@@ -377,8 +452,9 @@ class Model(nn.Module):
         if self.configs.channel_mixing and self.channel_independence == 1:
             _, T, D = x_list[-1].size()
             coarse_scale_enc_out = x_list[-1].reshape(B, N, T * D)
-            coarse_scale_enc_out, _ = self.channel_mixing_attention(coarse_scale_enc_out, coarse_scale_enc_out,
-                                                                    coarse_scale_enc_out, None)
+            coarse_scale_enc_out, _ = self.channel_mixing_attention(
+                coarse_scale_enc_out, coarse_scale_enc_out, coarse_scale_enc_out, None
+            )
             x_list[-1] = coarse_scale_enc_out.reshape(B * N, T, D) + x_list[-1]
 
         enc_out_list = []
@@ -390,8 +466,10 @@ class Model(nn.Module):
             enc_out_list = self.encoder_model[i](enc_out_list)
 
         dec_out = self.projection_layer(enc_out_list[0])
-        dec_out = dec_out.reshape(B, self.configs.c_out, -1).permute(0, 2, 1).contiguous()
-        dec_out = self.revin_layers[0](dec_out, 'denorm')
+        dec_out = (
+            dec_out.reshape(B, self.configs.c_out, -1).permute(0, 2, 1).contiguous()
+        )
+        dec_out = self.revin_layers[0](dec_out, "denorm")
         return dec_out
 
     def imputation(self, x_enc, x_mark_enc, mask):
@@ -399,8 +477,9 @@ class Model(nn.Module):
         means = means.unsqueeze(1).detach()
         x_enc = x_enc - means
         x_enc = x_enc.masked_fill(mask == 0, 0)
-        stdev = torch.sqrt(torch.sum(x_enc * x_enc, dim=1) /
-                           torch.sum(mask == 1, dim=1) + 1e-5)
+        stdev = torch.sqrt(
+            torch.sum(x_enc * x_enc, dim=1) / torch.sum(mask == 1, dim=1) + 1e-5
+        )
         stdev = stdev.unsqueeze(1).detach()
         x_enc /= stdev
 
@@ -418,7 +497,10 @@ class Model(nn.Module):
                 x_list.append(x)
                 x_mark_list.append(x_mark)
         else:
-            for i, x in zip(range(len(x_enc)), x_enc, ):
+            for i, x in zip(
+                range(len(x_enc)),
+                x_enc,
+            ):
                 B, T, N = x.size()
                 if self.channel_independence == 1:
                     x = x.permute(0, 2, 1).contiguous().reshape(B * N, T, 1)
@@ -428,8 +510,9 @@ class Model(nn.Module):
             _, T, D = x_list[-1].size()
 
             coarse_scale_enc_out = x_list[-1].reshape(B, N, T * D)
-            coarse_scale_enc_out, _ = self.channel_mixing_attention(coarse_scale_enc_out, coarse_scale_enc_out,
-                                                                    coarse_scale_enc_out, None)
+            coarse_scale_enc_out, _ = self.channel_mixing_attention(
+                coarse_scale_enc_out, coarse_scale_enc_out, coarse_scale_enc_out, None
+            )
             x_list[-1] = coarse_scale_enc_out.reshape(B * N, T, D) + x_list[-1]
         enc_out_list = []
         for x in x_list:
@@ -440,25 +523,40 @@ class Model(nn.Module):
             enc_out_list = self.encoder_model[i](enc_out_list)
 
         dec_out = self.projection_layer(enc_out_list[0])
-        dec_out = dec_out.reshape(B, self.configs.c_out, -1).permute(0, 2, 1).contiguous()
-        dec_out = dec_out * \
-                  (stdev[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1))
-        dec_out = dec_out + \
-                  (means[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1))
+        dec_out = (
+            dec_out.reshape(B, self.configs.c_out, -1).permute(0, 2, 1).contiguous()
+        )
+        dec_out = dec_out * (stdev[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1))
+        dec_out = dec_out + (means[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1))
         return dec_out
 
-    def forward(self, indices_x, indices_y, x_enc, x_mark_enc, dec_inp, x_dec, x_mark_dec, cycle_index, mode, use_tf=False):
-        if self.task_name == 'long_term_forecast' or self.task_name == 'short_term_forecast':
+    def forward(
+        self,
+        indices_x,
+        indices_y,
+        x_enc,
+        x_mark_enc,
+        dec_inp,
+        x_dec,
+        x_mark_dec,
+        cycle_index,
+        mode,
+        use_tf=False,
+    ):
+        if (
+            self.task_name == "long_term_forecast"
+            or self.task_name == "short_term_forecast"
+        ):
             dec_out = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
             return dec_out
-        if self.task_name == 'imputation':
+        if self.task_name == "imputation":
             dec_out = self.imputation(x_enc, x_mark_enc, mask)
             return dec_out
-        if self.task_name == 'anomaly_detection':
+        if self.task_name == "anomaly_detection":
             dec_out = self.anomaly_detection(x_enc)
             return dec_out
-        if self.task_name == 'classification':
+        if self.task_name == "classification":
             dec_out = self.classification(x_enc, x_mark_enc)
             return dec_out
         else:
-            raise ValueError('Not implemented yet')
+            raise ValueError("Not implemented yet")

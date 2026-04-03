@@ -3,7 +3,9 @@ import torch.nn as nn
 
 
 class Inception_Block_V1(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, num_kernels=6, init_weight=True):
+    def __init__(
+        self, in_channels, out_channels, stride=1, num_kernels=6, init_weight=True
+    ):
         super(Inception_Block_V1, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -11,7 +13,15 @@ class Inception_Block_V1(nn.Module):
         self.stride = stride
         kernels = []
         for i in range(self.num_kernels):
-            kernels.append(nn.Conv2d(in_channels, out_channels, kernel_size=2 * i + 1, padding=i, stride=stride))
+            kernels.append(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=2 * i + 1,
+                    padding=i,
+                    stride=stride,
+                )
+            )
         self.kernels = nn.ModuleList(kernels)
         if init_weight:
             self._initialize_weights()
@@ -19,7 +29,7 @@ class Inception_Block_V1(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
@@ -32,7 +42,9 @@ class Inception_Block_V1(nn.Module):
 
 
 class Inception_Trans_Block_V1(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, num_kernels=6, init_weight=True):
+    def __init__(
+        self, in_channels, out_channels, stride=1, num_kernels=6, init_weight=True
+    ):
         super(Inception_Trans_Block_V1, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -42,7 +54,14 @@ class Inception_Trans_Block_V1(nn.Module):
         kernels = []
         for i in range(self.num_kernels):
             kernels.append(
-                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2 * i + 1, padding=i, stride=stride))
+                nn.ConvTranspose2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=2 * i + 1,
+                    padding=i,
+                    stride=stride,
+                )
+            )
         self.kernels = nn.ModuleList(kernels)
         if init_weight:
             self._initialize_weights()
@@ -50,7 +69,7 @@ class Inception_Trans_Block_V1(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.ConvTranspose2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
