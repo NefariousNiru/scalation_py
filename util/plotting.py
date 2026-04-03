@@ -9,7 +9,8 @@ import os
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
-plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.serif"] = ["Times New Roman", "Times", "DejaVu Serif"]
 from prettytable import PrettyTable
 import statsmodels.api as sm
 import numpy as np

@@ -5,7 +5,7 @@ __version__ = "1.0"
 __license__ = "MIT style license file"
 """
 
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 from modeling.statmodeling.model import Model
 from util.tools import display_model_info
 from numpy import ndarray
