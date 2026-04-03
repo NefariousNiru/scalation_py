@@ -7,7 +7,6 @@ from util.tools import (
 )
 from util.QoF import diagnose
 from util.plotting import plot_forecasts
-
 from modeling.neuralmodeling.models import (
     Transformer,
     Informer,
@@ -33,32 +32,16 @@ from modeling.neuralmodeling.models import (
     TimeMixerPP,
     TimeBridge,
     TimeXer,
+    ResidualTCN,
 )
-
-from statsmodels.tsa.filters.hp_filter import hpfilter
-from scipy.stats import wasserstein_distance
-from scipy.signal import find_peaks
-import math
-
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import optim
 from torch.optim import lr_scheduler
-from torch.utils.data import DataLoader
-
-import ray
 from ray.air import session
-from ray import tune
-
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 import os
 import time
-import warnings
 import random
 import datetime
 from tqdm.notebook import tqdm
@@ -274,6 +257,7 @@ class Experiment(object):
             "TimeMixerPP": TimeMixerPP,
             "TimeBridge": TimeBridge,
             "TimeXer": TimeXer,
+            "ResidualTCN": ResidualTCN,
         }
         model = model_dict[self.args["model_name"]].Model(self.args).float()
         if self.args["use_multi_gpu"] and self.args["use_gpu"]:
