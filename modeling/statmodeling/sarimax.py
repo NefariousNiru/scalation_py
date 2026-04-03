@@ -5,15 +5,11 @@ __version__ = "1.0"
 __license__ = "MIT style license file"
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
-
 from numpy import ndarray
 from tqdm.auto import tqdm
 from statsmodels.tsa.statespace.sarimax import SARIMAX as SARIMAX_
-
 from modeling.statmodeling.model import Model
 from util.tools import display_model_info
 

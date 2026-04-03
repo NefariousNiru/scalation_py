@@ -7,21 +7,10 @@ __license__ = "MIT style license file"
 
 import os
 import matplotlib.pyplot as plt
-import statsmodels.api as sm
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["font.serif"] = ["Times New Roman", "Times", "DejaVu Serif"]
-from prettytable import PrettyTable
 import statsmodels.api as sm
-import numpy as np
-from scipy.stats import shapiro, kstest, anderson
-from statsmodels.stats.diagnostic import het_breuschpagan, acorr_ljungbox
-from statsmodels.api import add_constant, OLS
-from statsmodels.stats.stattools import durbin_watson
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-
-from util.QoF import smape
 
 
 def plot_time_series(self) -> None:

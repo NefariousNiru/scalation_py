@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from tabulate import tabulate
-import pandas as pd
 
 
 class dotdict(dict):
