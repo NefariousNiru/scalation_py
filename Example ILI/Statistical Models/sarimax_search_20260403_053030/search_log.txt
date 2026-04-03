@@ -1,0 +1,211 @@
+Output dir: sarimax_search_20260403_053030
+Stage 1 runs: 12
+Stage 2 runs: 54
+Total runs: 66
+
+[Stage1 1/12] {'p': 1, 'q': 1, 'rc': 13}
+ -> sMAPE=22.9705, MAE=14210.1239, time=336.2s
+
+[Stage1 2/12] {'p': 1, 'q': 1, 'rc': 26}
+ -> sMAPE=23.1660, MAE=14159.1006, time=181.6s
+
+[Stage1 3/12] {'p': 1, 'q': 2, 'rc': 13}
+ -> sMAPE=23.4173, MAE=14145.3842, time=367.7s
+
+[Stage1 4/12] {'p': 1, 'q': 2, 'rc': 26}
+ -> sMAPE=23.5760, MAE=14068.0089, time=202.2s
+
+[Stage1 5/12] {'p': 2, 'q': 1, 'rc': 13}
+ -> sMAPE=25.2592, MAE=14380.1686, time=515.7s
+
+[Stage1 6/12] {'p': 2, 'q': 1, 'rc': 26}
+ -> sMAPE=25.4915, MAE=14284.1720, time=281.4s
+
+[Stage1 7/12] {'p': 2, 'q': 2, 'rc': 13}
+ -> sMAPE=25.2149, MAE=14339.2770, time=556.5s
+
+[Stage1 8/12] {'p': 2, 'q': 2, 'rc': 26}
+ -> sMAPE=25.4818, MAE=14262.0799, time=298.5s
+
+[Stage1 9/12] {'p': 3, 'q': 1, 'rc': 13}
+ -> sMAPE=25.2070, MAE=14339.5237, time=727.0s
+
+[Stage1 10/12] {'p': 3, 'q': 1, 'rc': 26}
+ -> sMAPE=25.4879, MAE=14273.2031, time=382.4s
+
+[Stage1 11/12] {'p': 3, 'q': 2, 'rc': 13}
+ -> sMAPE=25.1850, MAE=14455.8774, time=692.3s
+
+[Stage1 12/12] {'p': 3, 'q': 2, 'rc': 26}
+ -> sMAPE=25.3583, MAE=14280.6148, time=363.5s
+
+Best Stage 1: {'p': 1, 'q': 1, 'rc': 13, 'avg_mae_original': 14210.123946239639, 'avg_smape_original': 22.970513697122232, 'elapsed_sec': 336.1594259738922, 'status': 'ok'}
+
+[Stage2 1/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 5.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.8596, MAE=14003.8092, time=301.3s
+
+[Stage2 2/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 5.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.7154, MAE=15830.6135, time=290.3s
+
+[Stage2 3/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 5.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.8956, MAE=14114.6575, time=283.8s
+
+[Stage2 4/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 5.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.7930, MAE=15960.9900, time=325.4s
+
+[Stage2 5/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 5.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.9299, MAE=14179.1947, time=349.7s
+
+[Stage2 6/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 5.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.8140, MAE=16037.9996, time=359.9s
+
+[Stage2 7/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 6.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.7465, MAE=13884.8081, time=336.2s
+
+[Stage2 8/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 6.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.5976, MAE=15698.5747, time=306.2s
+
+[Stage2 9/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 6.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.8070, MAE=14017.6539, time=367.8s
+
+[Stage2 10/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 6.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.6236, MAE=15808.3457, time=418.0s
+
+[Stage2 11/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 6.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.8956, MAE=14132.0447, time=435.5s
+
+[Stage2 12/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 6.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.6581, MAE=15911.6648, time=378.5s
+
+[Stage2 13/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.6435, MAE=13768.4028, time=367.1s
+
+[Stage2 14/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.5137, MAE=15587.2772, time=365.8s
+
+[Stage2 15/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.6660, MAE=13838.2542, time=329.4s
+
+[Stage2 16/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.4386, MAE=15587.3466, time=307.4s
+
+[Stage2 17/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.7625, MAE=13940.0483, time=337.9s
+
+[Stage2 18/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.4608, MAE=15655.7549, time=324.1s
+
+[Stage2 19/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 5.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=23.0517, MAE=14270.4682, time=336.8s
+
+[Stage2 20/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 5.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.7961, MAE=16116.9856, time=346.2s
+
+[Stage2 21/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 5.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=23.0877, MAE=14299.7404, time=328.0s
+
+[Stage2 22/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 5.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.8497, MAE=16143.2306, time=384.4s
+
+[Stage2 23/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 5.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=23.0800, MAE=14298.1568, time=387.2s
+
+[Stage2 24/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 5.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.8413, MAE=16139.2162, time=397.1s
+
+[Stage2 25/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 6.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.9572, MAE=14191.0687, time=327.7s
+
+[Stage2 26/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 6.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.7255, MAE=16040.3855, time=346.9s
+
+[Stage2 27/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 6.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.9705, MAE=14210.1239, time=324.5s
+
+[Stage2 28/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 6.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.7216, MAE=16035.7213, time=401.0s
+
+[Stage2 29/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 6.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.9656, MAE=14225.0680, time=428.1s
+
+[Stage2 30/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 6.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.7234, MAE=16038.3607, time=412.2s
+
+[Stage2 31/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.8756, MAE=14128.5751, time=368.0s
+
+[Stage2 32/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.6669, MAE=16001.9324, time=357.4s
+
+[Stage2 33/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 7.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.8505, MAE=14101.7914, time=343.5s
+
+[Stage2 34/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 7.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.5892, MAE=15930.6795, time=367.0s
+
+[Stage2 35/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 7.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.8184, MAE=14090.7871, time=443.6s
+
+[Stage2 36/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 3, 'bump_mu': 7.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.5425, MAE=15889.5175, time=409.5s
+
+[Stage2 37/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 5.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.8937, MAE=14168.3972, time=352.6s
+
+[Stage2 38/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 5.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.6285, MAE=15960.4300, time=417.2s
+
+[Stage2 39/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 5.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.9191, MAE=14177.7276, time=464.8s
+
+[Stage2 40/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 5.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.6688, MAE=15966.9958, time=482.4s
+
+[Stage2 41/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 5.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.8906, MAE=14172.4268, time=587.1s
+
+[Stage2 42/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 5.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.6556, MAE=15968.2263, time=525.7s
+
+[Stage2 43/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 6.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.8672, MAE=14155.2169, time=369.9s
+
+[Stage2 44/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 6.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.6369, MAE=15958.7338, time=427.7s
+
+[Stage2 45/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 6.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.9178, MAE=14164.3486, time=458.2s
+
+[Stage2 46/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 6.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.6393, MAE=15950.2668, time=488.4s
+
+[Stage2 47/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 6.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.9041, MAE=14155.5701, time=565.3s
+
+[Stage2 48/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 6.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.6333, MAE=15944.2151, time=501.6s
+
+[Stage2 49/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': True}
+ -> sMAPE=22.8168, MAE=14148.0376, time=388.9s
+
+[Stage2 50/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': False}
+ -> sMAPE=27.5996, MAE=15955.1420, time=461.5s
+
+[Stage2 51/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 7.0, 'bump_s': 3.0, 'use_trend_exog': True}
+ -> sMAPE=22.8516, MAE=14145.0718, time=486.4s
+
+[Stage2 52/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 7.0, 'bump_s': 3.0, 'use_trend_exog': False}
+ -> sMAPE=27.5955, MAE=15938.7422, time=480.1s
+
+[Stage2 53/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 7.0, 'bump_s': 4.0, 'use_trend_exog': True}
+ -> sMAPE=22.8592, MAE=14133.2875, time=553.9s
+
+[Stage2 54/54] {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 4, 'bump_mu': 7.0, 'bump_s': 4.0, 'use_trend_exog': False}
+ -> sMAPE=27.5803, MAE=15915.8106, time=527.5s
+
+Search complete.
+Best overall: {'p': 1, 'q': 1, 'rc': 13, 'fourier_order': 2, 'bump_mu': 7.0, 'bump_s': 2.0, 'use_trend_exog': True, 'avg_mae_original': 13768.40279104766, 'avg_smape_original': 22.643527995366536, 'elapsed_sec': 367.1453597545624, 'status': 'ok'}
+Stage 1 CSV: sarimax_search_20260403_053030/stage1_results.csv
+Stage 2 CSV: sarimax_search_20260403_053030/stage2_results.csv
+Best QoF CSV: sarimax_search_20260403_053030/best_qof.csv
+Best summary TXT: sarimax_search_20260403_053030/best_result.txt

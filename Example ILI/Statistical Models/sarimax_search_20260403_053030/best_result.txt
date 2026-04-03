@@ -1,0 +1,11 @@
+p: 1
+q: 1
+rc: 13
+fourier_order: 2
+bump_mu: 7.0
+bump_s: 2.0
+use_trend_exog: True
+avg_mae_original: 13768.40279104766
+avg_smape_original: 22.643527995366536
+elapsed_sec: 367.1453597545624
+status: ok
