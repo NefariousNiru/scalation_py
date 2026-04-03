@@ -80,114 +80,12 @@ class SARIMAX(Model):
 
         super().__init__(args)
 
-        # Build exogenous dataframe aligned to the same clipped/raw series used by the target.
+        # Build exogenous dataframe aligned to the same clipped/raw series used by the target. and then audit it for correctness
         self.exog_df = self._build_exog_dataframe()
 
-    @staticmethod
-    def _student_t_bump(
-        week_idx_0_51: np.ndarray,
-        mu: float,
-        s: float,
-        nu: float = 4.0,
-    ) -> np.ndarray:
-        """
-        Smooth circular seasonal bump over epidemiological week.
-        """
-        period = 52.0
-        w = week_idx_0_51.astype(float)
-        d = np.abs(w - mu)
-        d = np.minimum(d, period - d)  # circular distance
-        z = 1.0 + (d**2) / (nu * (s**2))
-        return z ** (-(nu + 1.0) / 2.0)
-
-    def _build_exog_dataframe(self) -> pd.DataFrame:
-        """
-        Create time-safe engineered exogenous regressors aligned directly to the
-        already-loaded target dataframe length.
-
-        This avoids trying to reproduce the superclass data loading / clipping logic.
-        """
-        T = len(self.data)
-
-        # Best case: self.data is already indexed by datetime
-        if isinstance(self.data.index, pd.DatetimeIndex):
-            dt = pd.to_datetime(self.data.index)
-        else:
-            # Fallback: reload the CSV only to obtain the date sequence,
-            # but do NOT try to reapply clipping logic here.
-            raw_df = pd.read_csv(self.data_path).copy()
-            raw_df.columns = [str(c).lower() for c in raw_df.columns]
-
-            date_col = self.date_col.lower()
-            if date_col not in raw_df.columns:
-                raise ValueError(
-                    f"date_col='{self.date_col}' not found in dataset columns: {raw_df.columns.tolist()}"
-                )
-
-            raw_df[date_col] = pd.to_datetime(raw_df[date_col])
-            raw_df = raw_df.sort_values(date_col).reset_index(drop=True)
-
-            if len(raw_df) < T:
-                raise ValueError(
-                    f"Raw CSV has fewer rows ({len(raw_df)}) than loaded target data ({T})."
-                )
-
-            # Align by taking the same number of rows as the loaded data.
-            # This assumes load_data preserves temporal order.
-            raw_df = raw_df.iloc[-T:].reset_index(drop=True)
-            dt = pd.to_datetime(raw_df[date_col])
-
-        iso = pd.Series(dt).dt.isocalendar()
-        week_of_year = iso.week.astype(int).to_numpy()
-        week_of_year = np.where(week_of_year == 53, 52, week_of_year)
-        week_of_year = np.clip(week_of_year, 1, 52) - 1
-
-        t_index = np.arange(T, dtype=float)
-
-        exog = {}
-        exog["intercept"] = np.ones(T, dtype=float)
-
-        if self.use_trend_exog:
-            exog["time_trend"] = (t_index - t_index.mean()) / (t_index.std() + 1e-8)
-
-        if self.use_fourier_exog:
-            for k in range(1, self.fourier_order + 1):
-                angle = 2.0 * np.pi * k * week_of_year / 52.0
-                exog[f"sin_{k}"] = np.sin(angle)
-                exog[f"cos_{k}"] = np.cos(angle)
-
-        if self.use_bump_exog:
-            exog["bump"] = self._student_t_bump(
-                week_idx_0_51=week_of_year,
-                mu=self.bump_mu,
-                s=self.bump_s,
-                nu=self.bump_nu,
-            )
-
-        exog_df = pd.DataFrame(exog, index=self.data.index)
-
-        return exog_df
-
-    def _fit_model(self, endog: pd.Series, exog: pd.DataFrame):
-        """
-        Fit one SARIMAX model instance.
-        """
-        model = SARIMAX_(
-            endog=endog,
-            exog=exog,
-            order=(self.p, self.d, self.q),
-            seasonal_order=(self.P, self.D, self.Q, self.s),
-            trend=None,  # exog already carries intercept/trend structure
-            enforce_stationarity=False,
-            enforce_invertibility=False,
-        )
-
-        result = model.fit(
-            method=self.fit_method,
-            maxiter=self.optimizer_maxiter,
-            disp=False,
-        )
-        return result
+        # Already audited and alignment checked
+        # self.audit_exog_generation_dates()
+        # self.audit_exog_alignment()
 
     def train_test(self) -> None:
         """
@@ -263,3 +161,158 @@ class SARIMAX(Model):
             self.total_params = 0
 
         display_model_info(self)
+
+    @staticmethod
+    def _student_t_bump(
+        week_idx_0_51: np.ndarray,
+        mu: float,
+        s: float,
+        nu: float = 4.0,
+    ) -> np.ndarray:
+        """
+        Smooth circular seasonal bump over epidemiological week.
+        """
+        period = 52.0
+        w = week_idx_0_51.astype(float)
+        d = np.abs(w - mu)
+        d = np.minimum(d, period - d)  # circular distance
+        z = 1.0 + (d**2) / (nu * (s**2))
+        return z ** (-(nu + 1.0) / 2.0)
+
+    def _build_exog_dataframe(self) -> pd.DataFrame:
+        """
+        Create time-safe engineered exogenous regressors aligned directly to the
+        already-loaded target dataframe length.
+
+        This avoids trying to reproduce the superclass data loading / clipping logic.
+        """
+        T = len(self.data)
+
+        if hasattr(self, "dates") and self.dates is not None:
+            dt = pd.to_datetime(pd.Series(self.dates)).reset_index(drop=True)
+
+            if len(dt) != T:
+                raise ValueError(
+                    f"Length mismatch: len(self.dates)={len(dt)} but len(self.data)={T}."
+                )
+
+        elif isinstance(self.data.index, pd.DatetimeIndex):
+            dt = pd.to_datetime(self.data.index)
+
+        else:
+            raise ValueError(
+                "Could not obtain aligned dates for exogenous construction. "
+                "Expected self.dates from load_data() or a DatetimeIndex on self.data."
+            )
+
+        self._exog_generation_dates = pd.DatetimeIndex(dt)
+
+        iso = pd.Series(dt).dt.isocalendar()
+        week_of_year = iso.week.astype(int).to_numpy()
+        week_of_year = np.where(week_of_year == 53, 52, week_of_year)
+        week_of_year = np.clip(week_of_year, 1, 52) - 1
+
+        t_index = np.arange(T, dtype=float)
+
+        exog = {}
+        exog["intercept"] = np.ones(T, dtype=float)
+
+        if self.use_trend_exog:
+            exog["time_trend"] = (t_index - t_index.mean()) / (t_index.std() + 1e-8)
+
+        if self.use_fourier_exog:
+            for k in range(1, self.fourier_order + 1):
+                angle = 2.0 * np.pi * k * week_of_year / 52.0
+                exog[f"sin_{k}"] = np.sin(angle)
+                exog[f"cos_{k}"] = np.cos(angle)
+
+        if self.use_bump_exog:
+            exog["bump"] = self._student_t_bump(
+                week_idx_0_51=week_of_year,
+                mu=self.bump_mu,
+                s=self.bump_s,
+                nu=self.bump_nu,
+            )
+
+        exog_df = pd.DataFrame(exog)
+
+        if len(exog_df) != T:
+            raise ValueError(
+                f"Constructed exog_df has {len(exog_df)} rows but expected {T}."
+            )
+
+        return exog_df
+
+    def _fit_model(self, endog: pd.Series, exog: pd.DataFrame):
+        """
+        Fit one SARIMAX model instance.
+        """
+        model = SARIMAX_(
+            endog=endog,
+            exog=exog,
+            order=(self.p, self.d, self.q),
+            seasonal_order=(self.P, self.D, self.Q, self.s),
+            trend=None,  # exog already carries intercept/trend structure
+            enforce_stationarity=False,
+            enforce_invertibility=False,
+        )
+
+        result = model.fit(
+            method=self.fit_method,
+            maxiter=self.optimizer_maxiter,
+            disp=False,
+        )
+        return result
+
+    def audit_exog_alignment(self) -> None:
+        """
+        Basic structural validation that exog rows align with target rows.
+        Temporal alignment is validated separately in audit_exog_generation_dates().
+        """
+        if len(self.exog_df) != len(self.data):
+            raise ValueError(
+                f"Length mismatch: len(exog_df)={len(self.exog_df)} vs len(data)={len(self.data)}"
+            )
+
+        if self.exog_df.isna().any().any():
+            bad_cols = self.exog_df.columns[self.exog_df.isna().any()].tolist()
+            raise ValueError(f"Exog contains NaNs in columns: {bad_cols}")
+
+        debug_df = pd.DataFrame()
+        debug_df["target"] = self.data[self.target.lower()].values
+        for c in self.exog_df.columns[: min(5, len(self.exog_df.columns))]:
+            debug_df[c] = self.exog_df[c].values
+
+        print("\n[Alignment audit] head:")
+        print(debug_df.head(10))
+        print("\n[Alignment audit] tail:")
+        print(debug_df.tail(10))
+
+    def audit_exog_generation_dates(self) -> None:
+        if hasattr(self, "dates") and self.dates is not None:
+            target_dates = pd.to_datetime(pd.Series(self.dates)).reset_index(drop=True)
+            gen_dates = pd.to_datetime(
+                pd.Series(self._exog_generation_dates)
+            ).reset_index(drop=True)
+
+            if len(target_dates) != len(gen_dates):
+                raise ValueError(
+                    f"Date length mismatch: target_dates={len(target_dates)} vs gen_dates={len(gen_dates)}"
+                )
+
+            if not target_dates.equals(gen_dates):
+                cmp = pd.DataFrame(
+                    {
+                        "target_date": target_dates,
+                        "exog_generation_date": gen_dates,
+                    }
+                )
+                print(cmp.head(15))
+                print(cmp.tail(15))
+                raise ValueError(
+                    "Exog generation dates do not match load_data() dates row-by-row"
+                )
+        else:
+            raise ValueError(
+                "self.dates is unavailable. Cannot prove row-by-row date alignment."
+            )
