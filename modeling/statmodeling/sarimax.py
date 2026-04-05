@@ -1,14 +1,14 @@
 """
 __author__ = "Nirupom Bose Roy"
-__date__ = "2026-04-03"
-__version__ = "1.0"
+__date__ = "2026-04-04"
+__version__ = "2.0"
 __license__ = "MIT style license file"
 """
 
 import numpy as np
 import pandas as pd
 from numpy import ndarray
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from statsmodels.tsa.statespace.sarimax import SARIMAX as SARIMAX_
 from modeling.statmodeling.model import Model
 from util.tools import display_model_info
@@ -18,26 +18,21 @@ class SARIMAX(Model):
     """
     Target-only SARIMAX baseline for ILI-style weekly series.
 
-    Design goals
-    ------------
-    - Compatible with the existing Model superclass
-    - Forecasts ONLY the target series
-    - Uses time-safe engineered exogenous regressors by default
-    - Avoids using obviously leakage-prone columns such as % weighted ILI
+    What changed in this version
+    ----------------------------
+    1. Keeps the original trainNtest() behavior for your baseline pipeline.
+    2. Adds build_origin_forecast_dataset(), which generates aligned rolling-origin
+       forecast matrices over any origin range.
+    3. Exposes the exact artifacts needed for a publishable hybrid pipeline:
+       - history cutoff for each origin
+       - SARIMAX H-step forecast matrix
+       - true H-step matrix
+       - residual H-step matrix
 
-    Expected args additions
-    -----------------------
-    args["date_col"]                : str, default "date"
-    args["use_fourier_exog"]        : bool, default True
-    args["fourier_order"]           : int, default 3
-    args["use_bump_exog"]           : bool, default True
-    args["bump_mu"]                 : float, default 6.0
-    args["bump_s"]                  : float, default 3.0
-    args["bump_nu"]                 : float, default 4.0
-    args["use_trend_exog"]          : bool, default True
-    args["include_provider_exog"]   : bool, default False
-    args["include_patient_exog"]    : bool, default False
-    args["optimizer_maxiter"]       : int, default 100
+    Notes
+    -----
+    - This class still forecasts ONLY the target.
+    - Hybrid learning happens outside this class.
     """
 
     def __init__(self, args):
@@ -51,9 +46,7 @@ class SARIMAX(Model):
         self.s = args["s"]
 
         self.rc = args["rc"]
-        self.trend = args[
-            "trend"
-        ]  # usually "n" here, since exog carries mean/trend structure
+        self.trend = args["trend"]
         self.fit_method = args["fit_method"]
 
         self.date_col = args.get("date_col", "date")
@@ -80,23 +73,48 @@ class SARIMAX(Model):
 
         super().__init__(args)
 
-        # Build exogenous dataframe aligned to the same clipped/raw series used by the target. and then audit it for correctness
         self.exog_df = self._build_exog_dataframe()
 
-        # Already audited and alignment checked
-        # self.audit_exog_generation_dates()
-        # self.audit_exog_alignment()
+    # ============================================================
+    # Public baseline API
+    # ============================================================
 
     def train_test(self) -> None:
         """
-        Rolling-origin evaluation for target-only SARIMAX.
+        Standard outer test rolling-origin evaluation used by the existing
+        statistical-model pipeline.
 
-        Produces a forecast tensor of shape:
-            (test_size, pred_len, 1)
+        Produces:
+        - self.forecast_tensor
+        - self.forecast_tensor_original (via Model.trainNtest())
+        - self.rolling_origin_forecasts
+        - self.rolling_origin_truths
+        - self.rolling_origin_train_end_idx
+        - self.one_step_pred_series
         """
-        if len(self.exog_df) != len(self.data):
+        sample_offset = (self.pred_len - 1) if self.same_n_samples else 0
+
+        origin_start_idx = self.train_size
+        origin_end_idx_exclusive = len(self.data) - self.pred_len + 1
+
+        artifacts = self.build_origin_forecast_dataset(
+            origin_start_idx=origin_start_idx,
+            origin_end_idx_exclusive=origin_end_idx_exclusive,
+            return_original_scale=False,
+            verbose=True,
+        )
+
+        self.rolling_origin_forecasts = artifacts["forecast_matrix_model"]
+        self.rolling_origin_truths = artifacts["truth_matrix_model"]
+        self.rolling_origin_train_end_idx = artifacts["train_end_idx"]
+
+        n_origins = self.rolling_origin_forecasts.shape[0]
+
+        expected_n_origins = self.test_size - sample_offset
+        if n_origins != expected_n_origins:
             raise ValueError(
-                f"Exogenous dataframe length {len(self.exog_df)} does not match target data length {len(self.data)}."
+                f"Outer test origin count mismatch. "
+                f"Expected {expected_n_origins}, got {n_origins}."
             )
 
         self.forecast_tensor: ndarray[float] = np.full(
@@ -104,63 +122,202 @@ class SARIMAX(Model):
             fill_value=np.nan,
         )
 
-        sample_offset = (self.pred_len - 1) if self.same_n_samples else 0
+        self.one_step_pred_series: ndarray[float] = np.full(
+            shape=(len(self.data),),
+            fill_value=np.nan,
+        )
 
-        target_col = self.target.lower()
-        if target_col not in self.data.columns:
-            raise ValueError(
-                f"Target column '{target_col}' not found in self.data columns: {self.data.columns.tolist()}"
+        for j in range(n_origins):
+            start = self.rolling_origin_train_end_idx[j]
+            self.one_step_pred_series[start] = self.rolling_origin_forecasts[j, 0]
+
+            np.fill_diagonal(
+                self.forecast_tensor[j:, :, 0],
+                self.rolling_origin_forecasts[j].reshape(1, self.pred_len),
             )
 
-        y_all = self.data[target_col].reset_index(drop=True)
-        X_all = self.exog_df.reset_index(drop=True)
+        self.total_params = artifacts["last_result_params_count"]
+        display_model_info(self)
+
+    def build_origin_forecast_dataset(
+        self,
+        origin_start_idx: int,
+        origin_end_idx_exclusive: int,
+        return_original_scale: bool = True,
+        verbose: bool = False,
+    ) -> dict:
+        """
+        Build rolling-origin H-step forecast artifacts over an arbitrary origin range.
+
+        Parameters
+        ----------
+        origin_start_idx:
+            First origin index. Training uses rows [0 : origin_idx),
+            forecasting starts at row origin_idx.
+
+        origin_end_idx_exclusive:
+            One past the last origin index.
+
+        return_original_scale:
+            If True, includes original-scale matrices.
+
+        verbose:
+            If True, shows a tqdm progress bar.
+
+        Returns
+        -------
+        dict with:
+            train_end_idx
+            forecast_matrix_model
+            truth_matrix_model
+            residual_matrix_model
+            forecast_matrix_original
+            truth_matrix_original
+            residual_matrix_original
+            origin_dates
+            last_result_params_count
+        """
+        self._validate_origin_range(
+            origin_start_idx=origin_start_idx,
+            origin_end_idx_exclusive=origin_end_idx_exclusive,
+        )
+
+        y_all = self.data[self.target.lower()].reset_index(drop=True).astype(float)
+        X_all = self.exog_df.reset_index(drop=True).astype(float)
+
+        n_origins = origin_end_idx_exclusive - origin_start_idx
+
+        forecast_matrix_model = np.full((n_origins, self.pred_len), np.nan, dtype=float)
+        truth_matrix_model = np.full((n_origins, self.pred_len), np.nan, dtype=float)
+        train_end_idx = np.full((n_origins,), -1, dtype=int)
 
         sarimax_result = None
+        last_result_params_count = 0
 
-        for j in tqdm(range(self.test_size - sample_offset), desc="Rolling forecast"):
-            train_end_idx = self.train_size + j
+        iterator = range(n_origins)
+        if verbose:
+            iterator = tqdm(iterator, desc="Rolling forecast")
 
-            if self.skip_insample is None:
-                y_train = y_all.iloc[:train_end_idx]
-                X_train = X_all.iloc[:train_end_idx, :]
-            else:
-                y_train = y_all
-                X_train = X_all
+        for row in iterator:
+            origin_idx = origin_start_idx + row
+            train_end_idx[row] = origin_idx
 
-            if j % self.rc == 0 or sarimax_result is None:
-                sarimax_result = self._fit_model(
-                    endog=y_train,
-                    exog=X_train,
+            y_train = y_all.iloc[:origin_idx]
+            X_train = X_all.iloc[:origin_idx, :]
+
+            if sarimax_result is None or row % self.rc == 0:
+                sarimax_result = self._fit_model(endog=y_train, exog=X_train)
+                last_result_params_count = len(
+                    sarimax_result.params.index[sarimax_result.params.index != "sigma2"]
                 )
             else:
-                if self.skip_insample is None:
-                    new_y = y_all.iloc[train_end_idx - 1 : train_end_idx]
-                    new_X = X_all.iloc[train_end_idx - 1 : train_end_idx, :]
-                    sarimax_result = sarimax_result.append(
-                        endog=new_y,
-                        exog=new_X,
-                        refit=False,
-                    )
+                new_y = y_all.iloc[origin_idx - 1 : origin_idx]
+                new_X = X_all.iloc[origin_idx - 1 : origin_idx, :]
+                sarimax_result = sarimax_result.append(
+                    endog=new_y,
+                    exog=new_X,
+                    refit=False,
+                )
 
-            start = self.train_size + j
-            end = start + self.pred_len - 1
+            start = origin_idx
+            end = origin_idx + self.pred_len - 1
 
             X_future = X_all.iloc[start : end + 1, :]
+            y_future = y_all.iloc[start : end + 1].to_numpy(dtype=float)
 
             forecasts = sarimax_result.predict(
-                start=start, end=end, exog=X_future, dynamic=True
-            ).values.reshape(1, self.pred_len)
+                start=start,
+                end=end,
+                exog=X_future,
+                dynamic=True,
+            ).values.reshape(self.pred_len)
 
-            np.fill_diagonal(self.forecast_tensor[j:, :, 0], forecasts)
+            forecast_matrix_model[row, :] = forecasts
+            truth_matrix_model[row, :] = y_future
 
-        if sarimax_result is not None:
-            self.total_params = len(
-                sarimax_result.params.index[sarimax_result.params.index != "sigma2"]
+        residual_matrix_model = truth_matrix_model - forecast_matrix_model
+
+        result = {
+            "train_end_idx": train_end_idx,
+            "forecast_matrix_model": forecast_matrix_model,
+            "truth_matrix_model": truth_matrix_model,
+            "residual_matrix_model": residual_matrix_model,
+            "origin_dates": self._get_origin_dates(
+                origin_start_idx=origin_start_idx,
+                origin_end_idx_exclusive=origin_end_idx_exclusive,
+            ),
+            "last_result_params_count": last_result_params_count,
+        }
+
+        if return_original_scale:
+            result["forecast_matrix_original"] = self._to_original_scale(
+                forecast_matrix_model
             )
-        else:
-            self.total_params = 0
+            result["truth_matrix_original"] = self._to_original_scale(
+                truth_matrix_model
+            )
+            result["residual_matrix_original"] = (
+                result["truth_matrix_original"] - result["forecast_matrix_original"]
+            )
 
-        display_model_info(self)
+        return result
+
+    # ============================================================
+    # Internal helpers
+    # ============================================================
+
+    def _validate_origin_range(
+        self,
+        origin_start_idx: int,
+        origin_end_idx_exclusive: int,
+    ) -> None:
+        n_total = len(self.data)
+
+        if origin_start_idx <= 0:
+            raise ValueError(f"origin_start_idx must be > 0. Got {origin_start_idx}.")
+
+        if origin_end_idx_exclusive <= origin_start_idx:
+            raise ValueError(
+                f"origin_end_idx_exclusive must be > origin_start_idx. "
+                f"Got start={origin_start_idx}, end={origin_end_idx_exclusive}."
+            )
+
+        if origin_end_idx_exclusive > (n_total - self.pred_len + 1):
+            raise ValueError(
+                f"Origin range exceeds valid forecasting boundary. "
+                f"Max valid end_exclusive is {n_total - self.pred_len + 1}, "
+                f"got {origin_end_idx_exclusive}."
+            )
+
+    def _get_origin_dates(
+        self,
+        origin_start_idx: int,
+        origin_end_idx_exclusive: int,
+    ) -> pd.Series:
+        if hasattr(self, "dates") and self.dates is not None:
+            dates = pd.to_datetime(pd.Series(self.dates)).reset_index(drop=True)
+            return dates.iloc[origin_start_idx:origin_end_idx_exclusive].reset_index(
+                drop=True
+            )
+        raise ValueError("Aligned dates are unavailable on the SARIMAX object.")
+
+    def _to_original_scale(self, arr: np.ndarray) -> np.ndarray:
+        """
+        Convert from model space back to original scale.
+
+        Supports:
+        - normalization=None
+        - normalization='log'
+        """
+        if self.normalization is None:
+            return arr.copy()
+
+        if self.normalization == "log":
+            return np.expm1(arr)
+
+        raise NotImplementedError(
+            f"_to_original_scale is not implemented for normalization={self.normalization!r}."
+        )
 
     @staticmethod
     def _student_t_bump(
@@ -175,7 +332,7 @@ class SARIMAX(Model):
         period = 52.0
         w = week_idx_0_51.astype(float)
         d = np.abs(w - mu)
-        d = np.minimum(d, period - d)  # circular distance
+        d = np.minimum(d, period - d)
         z = 1.0 + (d**2) / (nu * (s**2))
         return z ** (-(nu + 1.0) / 2.0)
 
@@ -183,8 +340,6 @@ class SARIMAX(Model):
         """
         Create time-safe engineered exogenous regressors aligned directly to the
         already-loaded target dataframe length.
-
-        This avoids trying to reproduce the superclass data loading / clipping logic.
         """
         T = len(self.data)
 
@@ -247,12 +402,20 @@ class SARIMAX(Model):
         """
         Fit one SARIMAX model instance.
         """
+        if isinstance(endog, pd.DataFrame):
+            if endog.shape[1] != 1:
+                raise ValueError(f"Expected univariate endog, got shape {endog.shape}")
+            endog = endog.iloc[:, 0]
+
+        endog = pd.Series(endog).astype(float).reset_index(drop=True)
+        exog = pd.DataFrame(exog).astype(float).reset_index(drop=True)
+
         model = SARIMAX_(
             endog=endog,
             exog=exog,
             order=(self.p, self.d, self.q),
             seasonal_order=(self.P, self.D, self.Q, self.s),
-            trend=None,  # exog already carries intercept/trend structure
+            trend=None,
             enforce_stationarity=False,
             enforce_invertibility=False,
         )
@@ -265,10 +428,6 @@ class SARIMAX(Model):
         return result
 
     def audit_exog_alignment(self) -> None:
-        """
-        Basic structural validation that exog rows align with target rows.
-        Temporal alignment is validated separately in audit_exog_generation_dates().
-        """
         if len(self.exog_df) != len(self.data):
             raise ValueError(
                 f"Length mismatch: len(exog_df)={len(self.exog_df)} vs len(data)={len(self.data)}"
@@ -316,3 +475,9 @@ class SARIMAX(Model):
             raise ValueError(
                 "self.dates is unavailable. Cannot prove row-by-row date alignment."
             )
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if "args" in state and state["args"] is not None:
+            state["args"] = dict(state["args"])
+        return state
