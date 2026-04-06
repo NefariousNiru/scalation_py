@@ -65,49 +65,106 @@ def transform_data(self):
     return self.data
 
 
-def inverse_transformation(self):
+# def inverse_transformation(self):
+#     if self.normalization == "min_max":
+#         mins = np.zeros(len(self.scalers))
+#         maxs = np.zeros(len(self.scalers))
+#         for idx, (scaler_name, scaler) in enumerate(self.scalers.items()):
+#             mean = scaler.data_min_
+#             std = scaler.data_max_
+#             mins[idx] = mean
+#             maxs[idx] = std
+#         mins = mins.reshape(1, -1, 1)
+#         maxs = max.reshape(1, -1, 1)
+#         forecasts = self.forecast_tensor * (maxs - mins) + mins
+#     elif self.normalization == "z-score":
+#         means = np.zeros(len(self.scalers))
+#         stds = np.zeros(len(self.scalers))
+#
+#         for idx, (scaler_name, scaler) in enumerate(self.scalers.items()):
+#             mean = scaler.mean_
+#             std = scaler.scale_
+#             means[idx] = mean
+#             stds[idx] = std
+#         if self.features == "S":
+#             features = 1
+#         else:
+#             features = self.n_features
+#         means = means.reshape(1, 1, features)
+#         stds = stds.reshape(1, 1, features)
+#         forecasts = self.forecast_tensor * stds + means
+#     elif self.normalization == "log":
+#         if np.any(self.forecast_tensor < 0) == True:
+#             raise ValueError(
+#                 f"self.forecast_tensor contains {np.sum(self.forecast_tensor < 0)} negative numbers. inverse_log transformaion will result in NaN.\n"
+#                 f"Please either change the normalization or do further debugging."
+#             )
+#
+#         forecasts = np.zeros(self.forecast_tensor.shape)
+#         observed_data = self.data[-forecasts.shape[0] :]
+#         for k in range(self.forecast_tensor.shape[1]):
+#             residuals = observed_data.values - self.forecast_tensor[:, k, :]
+#             residual_variance = np.nanvar(residuals)
+#             bias_correction = residual_variance / 2
+#             forecasts[:, k, :] = np.expm1(self.forecast_tensor[:, k, :])
+#
+#     else:
+#         forecasts = self.forecast_tensor
+#     return forecasts
+
+
+def inverse_transformation(self, tensor):
+    """
+    Inverse-transform a forecast-like tensor from normalized/transformed space
+    back to the original data scale.
+
+    Parameters
+    ----------
+    tensor : np.ndarray
+        Forecast tensor of shape (n_samples, pred_len, n_features).
+
+    Returns
+    -------
+    np.ndarray
+        Tensor on the original scale, with the same shape as `tensor`.
+    """
+    if tensor is None:
+        return None
+
     if self.normalization == "min_max":
         mins = np.zeros(len(self.scalers))
         maxs = np.zeros(len(self.scalers))
-        for idx, (scaler_name, scaler) in enumerate(self.scalers.items()):
-            mean = scaler.data_min_
-            std = scaler.data_max_
-            mins[idx] = mean
-            maxs[idx] = std
-        mins = mins.reshape(1, -1, 1)
-        maxs = max.reshape(1, -1, 1)
-        forecasts = self.forecast_tensor * (maxs - mins) + mins
+
+        for idx, (_, scaler) in enumerate(self.scalers.items()):
+            mins[idx] = scaler.data_min_
+            maxs[idx] = scaler.data_max_
+
+        mins = mins.reshape(1, 1, -1)
+        maxs = maxs.reshape(1, 1, -1)
+        forecasts = tensor * (maxs - mins) + mins
+
     elif self.normalization == "z-score":
         means = np.zeros(len(self.scalers))
         stds = np.zeros(len(self.scalers))
 
-        for idx, (scaler_name, scaler) in enumerate(self.scalers.items()):
-            mean = scaler.mean_
-            std = scaler.scale_
-            means[idx] = mean
-            stds[idx] = std
-        if self.features == "S":
-            features = 1
-        else:
-            features = self.n_features
-        means = means.reshape(1, 1, features)
-        stds = stds.reshape(1, 1, features)
-        forecasts = self.forecast_tensor * stds + means
+        for idx, (_, scaler) in enumerate(self.scalers.items()):
+            means[idx] = scaler.mean_
+            stds[idx] = scaler.scale_
+
+        means = means.reshape(1, 1, -1)
+        stds = stds.reshape(1, 1, -1)
+        forecasts = tensor * stds + means
+
     elif self.normalization == "log":
-        if np.any(self.forecast_tensor < 0) == True:
+        if np.any(tensor < 0):
             raise ValueError(
-                f"self.forecast_tensor contains {np.sum(self.forecast_tensor < 0)} negative numbers. inverse_log transformaion will result in NaN.\n"
-                f"Please either change the normalization or do further debugging."
+                f"Forecast tensor contains {np.sum(tensor < 0)} negative values. "
+                f"Inverse log transformation with expm1 would be invalid for this pipeline."
             )
 
-        forecasts = np.zeros(self.forecast_tensor.shape)
-        observed_data = self.data[-forecasts.shape[0] :]
-        for k in range(self.forecast_tensor.shape[1]):
-            residuals = observed_data.values - self.forecast_tensor[:, k, :]
-            residual_variance = np.nanvar(residuals)
-            bias_correction = residual_variance / 2
-            forecasts[:, k, :] = np.expm1(self.forecast_tensor[:, k, :])
+        forecasts = np.expm1(tensor)
 
     else:
-        forecasts = self.forecast_tensor
+        forecasts = tensor.copy()
+
     return forecasts

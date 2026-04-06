@@ -1,5 +1,5 @@
 """
-__author__ = "Mohammed Aldosari"
+__author__ = "Mohammed Aldosari", "Nirupom Bose Roy"
 __date__ = 11/03/24
 __version__ = "1.0"
 __license__ = "MIT style license file"
@@ -8,13 +8,13 @@ __license__ = "MIT style license file"
 import copy
 import os
 import time
+import datetime
 import numpy as np
 from util.data_loading import load_data
 from util.data_transforms import transform_data
 from util.data_splitting import train_test_split
 from util.plotting import plot_time_series, plot_acf, plot_pacf
 from util.data_transforms import inverse_transformation
-import datetime
 from util.plotting import plot_forecasts
 from util.QoF import diagnose
 from util.tools import display_save_results
@@ -40,14 +40,21 @@ class Model:
         self.same_n_samples = self.args.same_n_samples
         self.plot_eda = self.args.plot_eda
         self.training_ratio = self.args.training_ratio
-
         self.debugging = self.args.debugging
 
+        # ---------------------------------------------------------------------
+        # Forecast / interval configuration
+        # ---------------------------------------------------------------------
         self.forecast_type = (
             self.args.forecast_type.lower()
             if self.args.forecast_type is not None
             else None
         )
+        self.interval_alpha = self.args.get("interval_alpha", 0.05)
+
+        # ---------------------------------------------------------------------
+        # Visualization / evaluation configuration
+        # ---------------------------------------------------------------------
         self.plot_scope_scale = (
             self.args.plot_scope_scale.lower()
             if self.args.plot_scope_scale is not None
@@ -74,10 +81,14 @@ class Model:
             else self.args.modeling_approach
         )
 
+        # ---------------------------------------------------------------------
+        # Validation
+        # ---------------------------------------------------------------------
         if self.training_ratio <= 0 or self.training_ratio >= 100:
             raise ValueError(
-                f"Invalid value for 'training_ratio'. Expected a fraction or whole number between 0 and 100. For 80% training ratio, both 0.8 and 80 should work.\n"
-                f"Received: {self.training_ratio}."
+                f"Invalid value for 'training_ratio'. Expected a fraction or whole "
+                f"number between 0 and 100. For 80% training ratio, both 0.8 and 80 "
+                f"should work.\nReceived: {self.training_ratio}."
             )
 
         self.training_ratio = (
@@ -86,10 +97,16 @@ class Model:
             else self.args.training_ratio
         )
 
+        if not (0 < self.interval_alpha < 1):
+            raise ValueError(
+                f"Invalid value for 'interval_alpha'. Expected a float in (0, 1).\n"
+                f"Received: {self.interval_alpha}."
+            )
+
         if self.forecast_type not in ["point", "interval"]:
             raise ValueError(
-                f"Invalid value for 'forecast_type'. Expected one of the following 'point' or 'interval'\n"
-                f"Received: {self.forecast_type}."
+                f"Invalid value for 'forecast_type'. Expected one of the following "
+                f"'point' or 'interval'\nReceived: {self.forecast_type}."
             )
 
         if self.plot_scope_scale not in [
@@ -100,32 +117,34 @@ class Model:
             None,
         ]:
             raise ValueError(
-                f"Invalid value for 'plot_scope_scale'. Expected one of the following 'all_original', 'all_normalized', 'test_original', 'test_normalized', or None\n"
-                f"Received: {self.plot_scope_scale}."
+                f"Invalid value for 'plot_scope_scale'. Expected one of the "
+                f"following 'all_original', 'all_normalized', 'test_original', "
+                f"'test_normalized', or None\nReceived: {self.plot_scope_scale}."
             )
 
         if self.features not in ["ms", "m", "s"]:
             raise ValueError(
-                f"Invalid value for 'features'. Expected one of the following 'ms', 'm', 's'\n"
-                f"Received: {self.features}."
+                f"Invalid value for 'features'. Expected one of the following "
+                f"'ms', 'm', 's'\nReceived: {self.features}."
             )
 
         if self.qof_calculation_mode not in ["single_horizon", "aggregated_horizons"]:
             raise ValueError(
-                f"Invalid value for 'qof_calculation_mode'. Expected one of the following 'single_horizon' or 'aggregated_horizons'\n"
+                f"Invalid value for 'qof_calculation_mode'. Expected one of the "
+                f"following 'single_horizon' or 'aggregated_horizons'\n"
                 f"Received: {self.qof_calculation_mode}."
             )
 
         if type(self.same_n_samples) is not bool:
             raise ValueError(
-                f"Invalid value for 'same_n_samples'. Expected a boolean (True or False)\n"
-                f"Received: {self.same_n_samples}."
+                f"Invalid value for 'same_n_samples'. Expected a boolean "
+                f"(True or False)\nReceived: {self.same_n_samples}."
             )
 
         if type(self.plot_eda) is not bool:
             raise ValueError(
-                f"Invalid value for 'plot_eda'. Expected a boolean (True or False)\n"
-                f"Received: {self.plot_eda}."
+                f"Invalid value for 'plot_eda'. Expected a boolean "
+                f"(True or False)\nReceived: {self.plot_eda}."
             )
 
         if type(self.horizons) is not list:
@@ -136,19 +155,22 @@ class Model:
 
         if self.normalization not in ["log", "z-score", "log_z-score", None]:
             raise ValueError(
-                f"Invalid value for 'normalization'. Expected one of the following 'log', 'z-score', or None.\n"
-                f"Received: {self.normalization}."
+                f"Invalid value for 'normalization'. Expected one of the following "
+                f"'log', 'z-score', or None.\nReceived: {self.normalization}."
             )
 
         if self.modeling_approach not in ["joint", "individual"]:
             raise ValueError(
-                f"Invalid value for 'modeling_approach'. Expected 'joint' or 'individual'.\n"
-                f"Received: {self.modeling_approach}."
+                f"Invalid value for 'modeling_approach'. Expected 'joint' or "
+                f"'individual'.\nReceived: {self.modeling_approach}."
             )
 
         if self.horizons != sorted(self.horizons):
             self.horizons.sort()
 
+        # ---------------------------------------------------------------------
+        # Validation mode
+        # ---------------------------------------------------------------------
         if self.skip_insample is None:
             self.validation = "Out-of-Sample"
         else:
@@ -156,38 +178,98 @@ class Model:
 
         self.pred_len = max(self.horizons)
 
+        # ---------------------------------------------------------------------
+        # Load data
+        # ---------------------------------------------------------------------
         load_data(self)
         self.columns = self.data.columns
         self.data.columns = self.data.columns.str.lower()
+
         if self.target.lower() not in self.data.columns.to_list():
             raise ValueError(
-                f"Invalid value for 'target'. Expected one of the following: {self.data.columns.to_list()}.\n"
-                f"Received: {self.target}."
+                f"Invalid value for 'target'. Expected one of the following: "
+                f"{self.data.columns.to_list()}.\nReceived: {self.target}."
             )
 
         if self.features == "s":
             self.data = self.data[[self.target.lower()]]
-        """
-        if self.debugging:
-            new_data = []
-            value = self.data.iloc[-1, :].values[0]
-            for i in range(12):
-                value = value + random.randint(-2,2)
-                new_data.append(value)
-            print(new_data)
-            df_new = pd.DataFrame({'ilitotal': new_data})
-
-            self.data = pd.concat([self.data, df_new], ignore_index=True)"""
 
         self.target_feature = self.data.columns.get_loc(self.target.lower())
         self.n_features = len(self.data.columns)
 
+        # ---------------------------------------------------------------------
+        # Forecast tensors
+        # ---------------------------------------------------------------------
+        self.forecast_tensor = None
+        self.forecast_tensor_original = None
+
+        self.lower_forecast_tensor = None
+        self.upper_forecast_tensor = None
+        self.lower_forecast_tensor_original = None
+        self.upper_forecast_tensor_original = None
+
+        # ---------------------------------------------------------------------
+        # Misc
+        # ---------------------------------------------------------------------
         self.qof = None
         self.today = str(datetime.datetime.today().strftime("%Y-%m-%d"))
 
-    def trainNtest(self) -> np.array:
+    # =========================================================================
+    # Internal helpers
+    # =========================================================================
+    def _reset_forecast_outputs(self) -> None:
+        """Reset all forecast outputs before a new train_test() call."""
+        self.forecast_tensor = None
+        self.forecast_tensor_original = None
 
+        self.lower_forecast_tensor = None
+        self.upper_forecast_tensor = None
+        self.lower_forecast_tensor_original = None
+        self.upper_forecast_tensor_original = None
+
+    def _validate_forecast_outputs(self) -> None:
+        """
+        Validate that child classes populated the required forecast outputs.
+
+        Point mode requires:
+            - forecast_tensor
+
+        Interval mode requires:
+            - forecast_tensor
+            - lower_forecast_tensor
+            - upper_forecast_tensor
+        """
+        if self.forecast_tensor is None:
+            raise RuntimeError(
+                f"{self.model_name} did not populate 'forecast_tensor' in train_test()."
+            )
+
+        if self.forecast_type == "interval":
+            if self.lower_forecast_tensor is None or self.upper_forecast_tensor is None:
+                raise NotImplementedError(
+                    f"{self.model_name} does not implement interval forecasts yet."
+                )
+
+    def _inverse_transform_forecasts(self) -> None:
+        """Inverse-transform all available forecast tensors to original scale."""
+        self.forecast_tensor_original = inverse_transformation(
+            self, self.forecast_tensor
+        )
+
+        if self.forecast_type == "interval":
+            self.lower_forecast_tensor_original = inverse_transformation(
+                self, self.lower_forecast_tensor
+            )
+            self.upper_forecast_tensor_original = inverse_transformation(
+                self, self.upper_forecast_tensor
+            )
+
+    # =========================================================================
+    # Main API
+    # =========================================================================
+    def trainNtest(self) -> np.ndarray:
         self.df_raw_len = len(self.data)
+
         self.folder_path_plots = (
             "./plots/"
             + str(self.validation)
@@ -252,9 +334,10 @@ class Model:
                 and self.rc is not None
             ):
                 raise ValueError(
-                    f"Invalid value for 'rc'. Expected a number greater that the test set size ({self.test_size}).\n"
-                    f"For in-sample validation, the model will be fitted once on the entire dataset. Retraining cycle is not required.\n"
-                    f"Received: {self.rc}."
+                    f"Invalid value for 'rc'. Expected a number greater that the "
+                    f"test set size ({self.test_size}).\nFor in-sample validation, "
+                    f"the model will be fitted once on the entire dataset. "
+                    f"Retraining cycle is not required.\nReceived: {self.rc}."
                 )
 
         if self.plot_eda:
@@ -268,10 +351,14 @@ class Model:
         start_time = time.time()
 
         if self.modeling_approach == "joint":
+            self._reset_forecast_outputs()
             self.train_test()
-            self.forecast_tensor_original = inverse_transformation(self)
+            self._validate_forecast_outputs()
+            self._inverse_transform_forecasts()
+
             if self.plot_scope_scale is not None:
                 plot_forecasts(self)
+
             if self.args.internal_diagonse:
                 self.args.internal_diagnose = True
                 mae_normalized_list, mae_original_list = diagnose(self)
@@ -279,20 +366,33 @@ class Model:
                 diagnose(self)
 
         elif self.modeling_approach == "individual":
+            original_horizons = list(self.horizons)
+            original_pred_len = self.pred_len
+
             for h in self.args.horizons:
+                self._reset_forecast_outputs()
 
                 self.horizons = [h]
                 self.pred_len = h
+
                 self.train_test()
-                self.forecast_tensor_original = inverse_transformation(self)
+                self._validate_forecast_outputs()
+                self._inverse_transform_forecasts()
+
                 if self.plot_scope_scale is not None:
                     plot_forecasts(self)
+
                 if self.args.internal_diagonse:
                     self.args.internal_diagnose = True
                     mae_normalized_list, mae_original_list = diagnose(self)
                 else:
                     diagnose(self)
+
                 self.args.mase_calc = None
+
+            self.horizons = original_horizons
+            self.pred_len = original_pred_len
+
         if self.args.internal_diagonse is None:
             print(self.args)
             display_save_results(self)
@@ -300,6 +400,7 @@ class Model:
         end_time = time.time()
         total_time = end_time - start_time
         print(f"Total time:{total_time} seconds. \n")
+
         if self.args.internal_diagonse:
             return mae_normalized_list, mae_original_list
         else:

@@ -1,5 +1,5 @@
 """
-__author__ = "Mohammed Aldosari"
+__author__ = "Mohammed Aldosari", "Nirupom Bose Roy"
 __date__ = 11/04/24
 __version__ = "1.0"
 __license__ = "MIT style license file"
@@ -98,15 +98,8 @@ def plot_pacf(self) -> None:
 
 def plot_forecasts(self) -> None:
     """
-    Plots the observed data along with forecasts at the specified horizon.
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    None
+    Plot observed data together with point forecasts or prediction intervals
+    for each requested horizon.
     """
 
     legend_x_axis = False
@@ -115,39 +108,105 @@ def plot_forecasts(self) -> None:
     legend_frameon = True
 
     for h in self.horizons:
-
+        # ---------------------------------------------------------------------
+        # Select scale-specific tensors
+        # ---------------------------------------------------------------------
         if "normalized" in self.plot_scope_scale:
-            forecasts = self.forecast_tensor
+            forecasts_all = self.forecast_tensor
+            lower_all = (
+                self.lower_forecast_tensor if self.forecast_type == "interval" else None
+            )
+            upper_all = (
+                self.upper_forecast_tensor if self.forecast_type == "interval" else None
+            )
+
             if "test" in self.plot_scope_scale:
-                actual = self.data.iloc[self.train_size :, :]
+                actual_df = self.data.iloc[self.train_size :, :]
             else:
-                actual = self.data
-            idx = actual.index
+                actual_df = self.data
+
+            idx = actual_df.index
+
         elif "original" in self.plot_scope_scale:
-            forecasts = self.forecast_tensor_original
+            forecasts_all = self.forecast_tensor_original
+            lower_all = (
+                self.lower_forecast_tensor_original
+                if self.forecast_type == "interval"
+                else None
+            )
+            upper_all = (
+                self.upper_forecast_tensor_original
+                if self.forecast_type == "interval"
+                else None
+            )
+
             if "test" in self.plot_scope_scale:
-                actual = self.data_.iloc[self.train_size :, :]
+                actual_df = self.data_.iloc[self.train_size :, :]
             else:
-                actual = self.data_
-            idx = actual.index
+                actual_df = self.data_
+
+            idx = actual_df.index
+
         else:
             raise ValueError(
-                "Invalid plot_scope_scale. Expected 'all_normalized', 'all_original', 'test_normalized', or 'test_original'."
+                "Invalid plot_scope_scale. Expected 'all_normalized', "
+                "'all_original', 'test_normalized', or 'test_original'."
             )
-        if self.features == "ms":
-            forecasts = forecasts[:, h - 1, self.target_feature]
-            actual = actual.iloc[:, self.target_feature].values
-        elif self.features == "m":
-            forecasts = forecasts[:, h - 1, self.target_feature]
-            actual = actual.iloc[:, self.target_feature].values
-        elif self.features == "s":
-            print("shapes shapes : ", forecasts.shape, actual.shape)
-            forecasts = forecasts[:, h - 1, :]
-            actual = actual.iloc[:, self.target_feature].values
 
+        # ---------------------------------------------------------------------
+        # Select target series for the requested horizon
+        # ---------------------------------------------------------------------
+        if self.features == "ms":
+            yp = forecasts_all[:, h - 1, self.target_feature].reshape(-1)
+            actual = actual_df.iloc[:, self.target_feature].values.reshape(-1)
+
+            if self.forecast_type == "interval":
+                lower = lower_all[:, h - 1, self.target_feature].reshape(-1)
+                upper = upper_all[:, h - 1, self.target_feature].reshape(-1)
+
+        elif self.features == "m":
+            yp = forecasts_all[:, h - 1, self.target_feature].reshape(-1)
+            actual = actual_df.iloc[:, self.target_feature].values.reshape(-1)
+
+            if self.forecast_type == "interval":
+                lower = lower_all[:, h - 1, self.target_feature].reshape(-1)
+                upper = upper_all[:, h - 1, self.target_feature].reshape(-1)
+
+        elif self.features == "s":
+            yp = forecasts_all[:, h - 1, -1].reshape(-1)
+            actual = actual_df.iloc[:, self.target_feature].values.reshape(-1)
+
+            if self.forecast_type == "interval":
+                lower = lower_all[:, h - 1, -1].reshape(-1)
+                upper = upper_all[:, h - 1, -1].reshape(-1)
+
+        else:
+            raise ValueError(
+                "Invalid features setting. Expected one of 'ms', 'm', or 's'."
+            )
+
+        forecast_idx = idx[-yp.shape[0] :]
+
+        # ---------------------------------------------------------------------
+        # Shared labels
+        # ---------------------------------------------------------------------
+        if self.normalization is None or "original" in self.plot_scope_scale:
+            ylabel = "Original Scale"
+        elif self.normalization == "z-score" and "normalized" in self.plot_scope_scale:
+            ylabel = "Normalized Scale"
+        elif (
+            self.normalization == "log" or self.normalization == "log_z-score"
+        ) and "normalized" in self.plot_scope_scale:
+            ylabel = "Transformed Scale"
+        else:
+            ylabel = "Value"
+
+        # ---------------------------------------------------------------------
+        # Point forecasts
+        # ---------------------------------------------------------------------
         if self.forecast_type == "point":
             plt.subplots(figsize=(4, 2.5))
-            yp = forecasts
+
             plt.plot(
                 idx,
                 actual,
@@ -158,29 +217,18 @@ def plot_forecasts(self) -> None:
                 label="y",
             )
             plt.plot(
-                idx[-yp.shape[0] :],
+                forecast_idx,
                 yp,
                 color="#26abe3",
                 marker="o",
                 markersize=1,
                 linewidth=0.5,
-                label=str("yp h = " + str(h)),
+                label=f"yp h = {h}",
             )
-
-            if self.normalization is None or "original" in self.plot_scope_scale:
-                ylabel = f"Original Scale"
-            elif (
-                self.normalization == "z-score"
-                and "normalized" in self.plot_scope_scale
-            ):
-                ylabel = f"Normalized Scale"
-            elif (
-                self.normalization == "log" or self.normalization == "log_z-score"
-            ) and "normalized" in self.plot_scope_scale:
-                ylabel = f"Transformed Scale"
 
             plt.ylabel(ylabel)
             plt.xlabel("Time")
+
             if show_title:
                 plt.title(
                     "Model: "
@@ -194,10 +242,12 @@ def plot_forecasts(self) -> None:
                     + " Forecast type: "
                     + self.forecast_type.capitalize()
                 )
+
             if show_grid:
                 plt.grid(True, which="both", linestyle="-", linewidth=0.5, alpha=0.3)
             else:
                 plt.grid(False)
+
             if legend_x_axis:
                 plt.legend(
                     loc="upper center",
@@ -207,6 +257,7 @@ def plot_forecasts(self) -> None:
                 )
             else:
                 plt.legend(frameon=legend_frameon)
+
             file_path = os.path.join(
                 self.folder_path_plots,
                 str(self.validation)
@@ -222,10 +273,104 @@ def plot_forecasts(self) -> None:
                 + self.args["target"]
                 + ".pdf",
             )
+
             plt.savefig(file_path, bbox_inches="tight")
             plt.ticklabel_format(style="plain", axis="y")
             plt.show()
             plt.close()
 
+        # ---------------------------------------------------------------------
+        # Interval forecasts
+        # ---------------------------------------------------------------------
         elif self.forecast_type == "interval":
-            print("Interval plotting is to be implemented.")
+            plt.subplots(figsize=(4, 2.5))
+
+            plt.plot(
+                idx,
+                actual,
+                color="#ef4470",
+                linewidth=0.5,
+                marker="o",
+                markersize=1,
+                label="y",
+            )
+
+            plt.plot(
+                forecast_idx,
+                yp,
+                color="#26abe3",
+                marker="o",
+                markersize=1,
+                linewidth=0.5,
+                label=f"yp h = {h}",
+            )
+
+            coverage_pct = int(round((1.0 - self.interval_alpha) * 100))
+
+            plt.fill_between(
+                forecast_idx,
+                lower,
+                upper,
+                alpha=0.2,
+                color="#26abe3",
+                label=f"{coverage_pct}% PI",
+            )
+
+            plt.ylabel(ylabel)
+            plt.xlabel("Time")
+
+            if show_title:
+                plt.title(
+                    "Model: "
+                    + self.model_name
+                    + " Validation: "
+                    + self.validation
+                    + "\nDataset: "
+                    + self.dataset
+                    + " Target: "
+                    + self.target
+                    + " Forecast type: "
+                    + self.forecast_type.capitalize()
+                )
+
+            if show_grid:
+                plt.grid(True, which="both", linestyle="-", linewidth=0.5, alpha=0.3)
+            else:
+                plt.grid(False)
+
+            if legend_x_axis:
+                plt.legend(
+                    loc="upper center",
+                    bbox_to_anchor=(0.5, -0.15),
+                    ncol=3,
+                    frameon=legend_frameon,
+                )
+            else:
+                plt.legend(frameon=legend_frameon)
+
+            file_path = os.path.join(
+                self.folder_path_plots,
+                str(self.validation)
+                + "_"
+                + str(self.model_name)
+                + "_"
+                + str(self.pred_len)
+                + "_"
+                + str(h + 1)
+                + "_"
+                + self.args["plot_scope_scale"]
+                + "_"
+                + self.args["target"]
+                + "_interval.pdf",
+            )
+
+            plt.savefig(file_path, bbox_inches="tight")
+            plt.ticklabel_format(style="plain", axis="y")
+            plt.show()
+            plt.close()
+
+        else:
+            raise ValueError(
+                f"Invalid forecast_type: {self.forecast_type}. "
+                f"Expected 'point' or 'interval'."
+            )

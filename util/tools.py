@@ -89,28 +89,74 @@ class EarlyStopping:
 
 
 def display_save_results(self):
-
     file_path = str("results/results " + self.today + ".csv")
-    averages = ["Avg.", ""] + self.qof.iloc[:, 2:].mean().tolist()
-    self.qof.loc[len(self.qof)] = averages
     target = self.args["target"]
+
+    # -------------------------------------------------------------------------
+    # Build point table
+    # -------------------------------------------------------------------------
+    point_cols = self.args["qof_to_display"]
+    qof_point_to_show = self.qof_point.copy()
+
+    point_averages = ["Avg.", ""] + qof_point_to_show.iloc[:, 2:].mean().tolist()
+    qof_point_to_show.loc[len(qof_point_to_show)] = point_averages
+
     print(
-        f"\033[1mQuality of Fit (QoF) for {self.model_name} Task: {self.features.upper()} Target: {target}\033[0m"
+        f"\033[1mPoint QoF for {self.model_name} Task: {self.features.upper()} Target: {target}\033[0m"
     )
-    columns_to_display = self.args["qof_to_display"]
     print(
         tabulate(
-            self.qof[columns_to_display].round(4),
+            qof_point_to_show.round(4),
             headers="keys",
             tablefmt="pretty",
             showindex=False,
         )
     )
-    with open(file_path, "a", newline="") as file:
-        file.write("\n" + self.model_name + " " + self.validation + "\n")
-        self.qof[columns_to_display].to_csv(
-            file, header=True, index=False, float_format="%.3f"
+
+    # -------------------------------------------------------------------------
+    # Build interval table if applicable
+    # -------------------------------------------------------------------------
+    if self.forecast_type == "interval" and self.qof_interval is not None:
+        interval_cols = self.args["pi_to_display"]
+        qof_interval_to_show = self.qof_interval.copy()
+
+        interval_averages = ["Avg.", ""] + qof_interval_to_show.iloc[
+            :, 2:
+        ].mean().tolist()
+        qof_interval_to_show.loc[len(qof_interval_to_show)] = interval_averages
+
+        print(
+            f"\n\033[1mPrediction Interval QoF for {self.model_name} Task: {self.features.upper()} Target: {target}\033[0m"
         )
+        print(
+            tabulate(
+                qof_interval_to_show.round(4),
+                headers="keys",
+                tablefmt="pretty",
+                showindex=False,
+            )
+        )
+    else:
+        qof_interval_to_show = None
+
+    # -------------------------------------------------------------------------
+    # Save both tables
+    # -------------------------------------------------------------------------
+    with open(file_path, "a", newline="") as file:
+        file.write("\n" + self.model_name + " " + self.validation + " - Point QoF\n")
+        qof_point_to_show.to_csv(file, header=True, index=False, float_format="%.3f")
+
+        if qof_interval_to_show is not None:
+            file.write(
+                "\n"
+                + self.model_name
+                + " "
+                + self.validation
+                + " - Prediction Interval QoF\n"
+            )
+            qof_interval_to_show.to_csv(
+                file, header=True, index=False, float_format="%.3f"
+            )
 
 
 def display_model_info(self):

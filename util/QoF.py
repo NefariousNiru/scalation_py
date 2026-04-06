@@ -1,5 +1,5 @@
 """
-__author__ = "Mohammed Aldosari"
+__author__ = "Mohammed Aldosari", "Nirupom Bose Roy"
 __date__ = 2/22/24
 __version__ = "1.0"
 __listicense__ = "MIT style license file"
@@ -19,50 +19,18 @@ sys.path.append(project_root)
 pd.set_option("display.float_format", lambda x: "%.3f" % x)
 
 """
-QoF: 
-    A module for evaulating the quality/goodness of fit
-    Supports both symmetric and asymmetric metrics
-
-Functions
-----------
-smape: 
-    def smape(y: np.ndarray, yp: np.ndarray) -> float:
-
-mae:
-    def mae(y: np.ndarray, yp: np.ndarray) -> float:
-
-sst:
-    def sst(y: np.ndarray) - > float:
-
-sse:
-    def sse(y: np.ndarray, yp: np.ndarray) -> float:
-
-r2:
-    def r2(y: np.ndarray, yp: np.ndarray) -> float:
-
-mse:
-    def mse(y: np.ndarray, yp: np.ndarray) -> float:
-
-rmse:
-    def rmse(y: np.ndarray, yp: np.ndarray) -> float:
+QoF:
+    A module for evaluating the quality/goodness of fit.
+    Supports point-forecast metrics and interval-forecast metrics.
 """
 
 
+# ============================================================================
+# Point forecast metrics
+# ============================================================================
+
+
 def smape(self, y: np.ndarray, yp: np.ndarray) -> float:
-    """
-    A function to calculate the symmetric mean absolute percentage error (sMAPE).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the observed data
-    yp: np.ndarray
-        the corresponding forecasts
-
-    Returned Values
-    ----------
-    smape : float
-    """
     epsilon = 1e-8
     numerator = np.abs(y - yp)
     denominator = np.abs(y) + np.abs(yp) + epsilon
@@ -72,20 +40,6 @@ def smape(self, y: np.ndarray, yp: np.ndarray) -> float:
 
 
 def mae(self, y: np.ndarray, yp: np.ndarray) -> float:
-    """
-    A function to calculate the mean absolute error (MAE).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the response data
-    yp: np.ndarray
-        the predicted/forecasted outputs
-
-    Returned Values
-    ----------
-    mae : float
-    """
     maes = np.abs(y - yp)
     maes = np.mean(maes, axis=0)
     if self.args.get("internal_diagnose"):
@@ -96,59 +50,18 @@ def mae(self, y: np.ndarray, yp: np.ndarray) -> float:
 
 
 def sst(self, y: np.ndarray, sample_mean) -> float:
-    """
-    A function to calculate the sum of squares total (SST).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the response data
-
-    Returned Values
-    ----------
-    sst : float
-    """
     ssts = (y - np.squeeze(sample_mean.values)) ** 2
     ssts = np.sum(ssts, axis=0)
     return ssts
 
 
 def sse(self, y: np.ndarray, yp: np.ndarray) -> float:
-    """
-    A function to calculate the sum of squared errors (SSE).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the response data
-    yp: np.ndarray
-        the predicted/forecasted outputs
-
-    Returned Values
-    ----------
-    sse : float
-    """
-
     sses = (y - yp) ** 2
     sses = np.sum(sses, axis=0)
     return sses
 
 
 def r2q(self, y: np.ndarray, yp: np.ndarray, sample_mean) -> float:
-    """
-    A function to calculate r squared.
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the response data
-    yp: np.ndarray
-        the predicted/forecasted outputs
-
-    Returned Values
-    ----------
-    r2 : float
-    """
     sse_ = sse(self, y, yp)
     sst_ = sst(self, y, sample_mean)
 
@@ -158,20 +71,6 @@ def r2q(self, y: np.ndarray, yp: np.ndarray, sample_mean) -> float:
 
 
 def mse(self, y: np.ndarray, yp: np.ndarray) -> float:
-    """
-    A function to calculate mean squared error (MSE).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the response data
-    yp: np.ndarray
-        the predicted/forecasted outputs
-
-    Returned Values
-    ----------
-    mse : float
-    """
     mses = (y - yp) ** 2
     mses = np.mean(mses, axis=0)
     mses = mses.flatten()
@@ -179,27 +78,12 @@ def mse(self, y: np.ndarray, yp: np.ndarray) -> float:
 
 
 def rmse(self, y: np.ndarray, yp: np.ndarray) -> float:
-    """
-    A function to calculate root mean squared error (RMSE).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        the response data
-    yp: np.ndarray
-        the predicted/forecasted outputs
-
-    Returned Values
-    ----------
-    rmse : float
-    """
     rmses = np.sqrt(mse(self, y, yp))
     rmses = rmses.flatten()
     return rmses
 
 
 def corr(self, y: np.ndarray, yp: np.ndarray) -> float:
-    # add docstring
     mean_y = np.mean(y, axis=0)
     mean_yp = np.mean(yp, axis=0)
 
@@ -213,13 +97,11 @@ def corr(self, y: np.ndarray, yp: np.ndarray) -> float:
 
 
 def bias(self, y: np.ndarray, yp: np.ndarray) -> float:
-    # add docstring
     biases = np.mean(yp - y, axis=0)
     return biases
 
 
 def mase(self, y: np.ndarray, yp: np.ndarray, maes_naive=None) -> float:
-    # add docstring
     maes = np.abs(y - yp)
     maes = np.mean(maes, axis=0)
     maes = maes.flatten()
@@ -232,34 +114,123 @@ def mase(self, y: np.ndarray, yp: np.ndarray, maes_naive=None) -> float:
 
 
 def mape(self, y: np.ndarray, yp: np.ndarray) -> float:
-    """
-    A function to calculate the mean absolute percentage error (MAPE).
-
-    Arguments
-    ----------
-    y: np.ndarray
-        The observed data
-    yp: np.ndarray
-        The corresponding forecasts
-
-    Returned Values
-    ----------
-    mape : float
-    """
     epsilon = 1e-8
     mape_values = np.mean(100 * np.abs((y - yp) / (y + epsilon)), axis=0)
     return mape_values
 
 
-def get_metrics(
-    self, actual, forecasts, sample_mean, maes_naive=None
-) -> Tuple[int, float, float, float]:
-    # add docstring
+# ============================================================================
+# Interval forecast metrics
+# ============================================================================
 
+
+def picp(self, y: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> float:
+    """
+    Prediction Interval Coverage Probability.
+    Fraction of observations falling inside the prediction interval.
+    """
+    inside = ((y >= lower) & (y <= upper)).astype(float)
+    return np.mean(inside, axis=0).flatten()
+
+
+def ace(self, y: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> float:
+    """
+    Average Coverage Error = PICP - PINC
+    where PINC = 1 - interval_alpha.
+    """
+    nominal_coverage = 1.0 - self.interval_alpha
+    return (picp(self, y, lower, upper) - nominal_coverage).flatten()
+
+
+def pinaw(self, y: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> float:
+    """
+    Prediction Interval Normalized Average Width.
+    Normalized by the range of observed values in the evaluation sample.
+    """
+    widths = upper - lower
+    y_range = np.nanmax(y, axis=0) - np.nanmin(y, axis=0)
+    y_range = np.where(np.abs(y_range) < 1e-8, 1e-8, y_range)
+    pinaw_ = np.mean(widths, axis=0) / y_range
+    return pinaw_.flatten()
+
+
+def mis(self, y: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> float:
+    """
+    Mean Interval Score for a central (1 - alpha) prediction interval.
+    Lower is better.
+    """
+    alpha = self.interval_alpha
+
+    interval_width = upper - lower
+    below_penalty = (2.0 / alpha) * (lower - y) * (y < lower)
+    above_penalty = (2.0 / alpha) * (y - upper) * (y > upper)
+
+    score = interval_width + below_penalty + above_penalty
+    return np.mean(score, axis=0).flatten()
+
+
+def wis(
+    self, y: np.ndarray, lower: np.ndarray, upper: np.ndarray, yp: np.ndarray
+) -> float:
+    """
+    Weighted Interval Score.
+
+    For the current single-interval implementation, this is set equal to MIS.
+    If multiple central intervals / quantiles are added later, generalize this.
+    """
+    return mis(self, y, lower, upper)
+
+
+# ============================================================================
+# Shared metric collection
+# ============================================================================
+
+
+def get_metrics(
+    self,
+    actual,
+    forecasts,
+    sample_mean,
+    maes_naive=None,
+    lower=None,
+    upper=None,
+) -> Tuple:
+    """
+    Compute point metrics, and optionally interval metrics if lower/upper bounds
+    are provided.
+
+    Parameters
+    ----------
+    actual : np.ndarray
+        Observed values.
+    forecasts : np.ndarray
+        Point forecasts.
+    sample_mean : Any
+        Mean of sample used for R^2-like metrics.
+    maes_naive : optional
+        Naive MAE baseline for MASE.
+    lower : np.ndarray, optional
+        Lower prediction interval bound.
+    upper : np.ndarray, optional
+        Upper prediction interval bound.
+
+    Returns
+    -------
+    Tuple
+        Point metrics plus interval metrics (if interval bounds are provided).
+    """
     if forecasts.ndim == 1:
         valid_indices = ~np.isnan(forecasts)
+        if lower is not None:
+            valid_indices &= ~np.isnan(lower)
+        if upper is not None:
+            valid_indices &= ~np.isnan(upper)
     else:
         valid_indices = ~np.isnan(forecasts).any(axis=1)
+        if lower is not None:
+            valid_indices &= ~np.isnan(lower).any(axis=1)
+        if upper is not None:
+            valid_indices &= ~np.isnan(upper).any(axis=1)
 
     y = actual[valid_indices]
     yp = forecasts[valid_indices]
@@ -271,16 +242,51 @@ def get_metrics(
     r2q_ = r2q(self, y, yp, sample_mean)
     sse_ = sse(self, y, yp)
     sst_ = sst(self, y, sample_mean)
-
     corr_ = corr(self, y, yp)
-
     bias_ = bias(self, y, yp)
-
     mase_ = mase(self, y, yp, maes_naive)
 
-    yp_shape = yp.shape
+    n_ = yp.shape[0]
 
-    return yp_shape[0], mse_, rmse_, mae_, smape_, mase_, sse_, sst_, r2q_, corr_, bias_
+    if lower is not None and upper is not None:
+        lo = lower[valid_indices]
+        hi = upper[valid_indices]
+
+        picp_ = picp(self, y, lo, hi)
+        ace_ = ace(self, y, lo, hi)
+        pinaw_ = pinaw(self, y, lo, hi)
+        mis_ = mis(self, y, lo, hi)
+        wis_ = wis(self, y, lo, hi, yp)
+    else:
+        picp_ = np.full_like(mse_, np.nan, dtype=float)
+        ace_ = np.full_like(mse_, np.nan, dtype=float)
+        pinaw_ = np.full_like(mse_, np.nan, dtype=float)
+        mis_ = np.full_like(mse_, np.nan, dtype=float)
+        wis_ = np.full_like(mse_, np.nan, dtype=float)
+
+    return (
+        n_,
+        mse_,
+        rmse_,
+        mae_,
+        smape_,
+        mase_,
+        sse_,
+        sst_,
+        r2q_,
+        corr_,
+        bias_,
+        picp_,
+        ace_,
+        pinaw_,
+        mis_,
+        wis_,
+    )
+
+
+# ============================================================================
+# Diagnose / QoF table
+# ============================================================================
 
 
 def diagnose(self):
@@ -294,6 +300,7 @@ def diagnose(self):
         args.dataset = self.args.get("dataset")
         args.target = self.args.get("target")
         args.forecast_type = self.args.get("forecast_type")
+        args.interval_alpha = self.args.get("interval_alpha", 0.05)
         args.plot_scope_scale = None
         args.plot_eda = False
         args.qof_calculation_mode = self.args.get("qof_calculation_mode")
@@ -306,6 +313,7 @@ def diagnose(self):
         self.args["mase_calc"] = "done"
         args.mase_calc = "done"
         args.internal_diagonse = True
+
         rw_model = RandomWalk(args)
         self.mae_normalized_list, self.mae_original_list = rw_model.trainNtest()
 
@@ -324,6 +332,11 @@ def diagnose(self):
                 "R Squared Normalized",
                 "Corr Normalized",
                 "Bias Normalized",
+                "PICP Normalized",
+                "ACE Normalized",
+                "PINAW Normalized",
+                "MIS Normalized",
+                "WIS Normalized",
                 "MSE Original",
                 "RMSE Original",
                 "MAE Original",
@@ -334,6 +347,11 @@ def diagnose(self):
                 "R Squared Original",
                 "Corr Original",
                 "Bias Original",
+                "PICP Original",
+                "ACE Original",
+                "PINAW Original",
+                "MIS Original",
+                "WIS Original",
             ]
         )
 
@@ -355,6 +373,16 @@ def diagnose(self):
             forecast_tensor_original = self.forecast_tensor_original[:, h, :]
             actual = self.data.iloc[self.train_size :, :].values
             actual_original = self.data_.iloc[self.train_size :, :].values
+
+            if self.forecast_type == "interval":
+                lower_tensor = self.lower_forecast_tensor[:, h, :]
+                upper_tensor = self.upper_forecast_tensor[:, h, :]
+                lower_tensor_original = self.lower_forecast_tensor_original[:, h, :]
+                upper_tensor_original = self.upper_forecast_tensor_original[:, h, :]
+            else:
+                lower_tensor = upper_tensor = None
+                lower_tensor_original = upper_tensor_original = None
+
         elif self.features == "ms":
             forecast_tensor = self.forecast_tensor[:, h, self.target_feature]
             forecast_tensor_original = self.forecast_tensor_original[
@@ -364,6 +392,20 @@ def diagnose(self):
             actual_original = self.data_.iloc[
                 self.train_size :, self.target_feature
             ].values
+
+            if self.forecast_type == "interval":
+                lower_tensor = self.lower_forecast_tensor[:, h, self.target_feature]
+                upper_tensor = self.upper_forecast_tensor[:, h, self.target_feature]
+                lower_tensor_original = self.lower_forecast_tensor_original[
+                    :, h, self.target_feature
+                ]
+                upper_tensor_original = self.upper_forecast_tensor_original[
+                    :, h, self.target_feature
+                ]
+            else:
+                lower_tensor = upper_tensor = None
+                lower_tensor_original = upper_tensor_original = None
+
         elif self.features == "s":
             target_feature = -1
             forecast_tensor = self.forecast_tensor[:, h, target_feature]
@@ -375,29 +417,58 @@ def diagnose(self):
                 self.train_size :, self.target_feature
             ].values
 
+            if self.forecast_type == "interval":
+                lower_tensor = self.lower_forecast_tensor[:, h, target_feature]
+                upper_tensor = self.upper_forecast_tensor[:, h, target_feature]
+                lower_tensor_original = self.lower_forecast_tensor_original[
+                    :, h, target_feature
+                ]
+                upper_tensor_original = self.upper_forecast_tensor_original[
+                    :, h, target_feature
+                ]
+            else:
+                lower_tensor = upper_tensor = None
+                lower_tensor_original = upper_tensor_original = None
+
         if self.args.get("internal_diagnose"):
-            normalized_metrics = get_metrics(
-                self, actual, forecast_tensor, self.sample_mean_normalized
-            )
-            original_metrics = get_metrics(
-                self, actual_original, forecast_tensor_original, self.sample_mean
-            )
-        else:
-            if len(self.mae_normalized_list) == 1:
-                h = -1
             normalized_metrics = get_metrics(
                 self,
                 actual,
                 forecast_tensor,
                 self.sample_mean_normalized,
-                self.mae_normalized_list[h],
+                lower=lower_tensor,
+                upper=upper_tensor,
             )
             original_metrics = get_metrics(
                 self,
                 actual_original,
                 forecast_tensor_original,
                 self.sample_mean,
-                self.mae_original_list[h],
+                lower=lower_tensor_original,
+                upper=upper_tensor_original,
+            )
+        else:
+            h_for_mase = h
+            if len(self.mae_normalized_list) == 1:
+                h_for_mase = -1
+
+            normalized_metrics = get_metrics(
+                self,
+                actual,
+                forecast_tensor,
+                self.sample_mean_normalized,
+                self.mae_normalized_list[h_for_mase],
+                lower=lower_tensor,
+                upper=upper_tensor,
+            )
+            original_metrics = get_metrics(
+                self,
+                actual_original,
+                forecast_tensor_original,
+                self.sample_mean,
+                self.mae_original_list[h_for_mase],
+                lower=lower_tensor_original,
+                upper=upper_tensor_original,
             )
 
         all_metrics = normalized_metrics + original_metrics[1:]
@@ -408,28 +479,66 @@ def diagnose(self):
 
     for h in self.horizons:
         row = {"h": h}
+
         if self.qof_calculation_mode == "single_horizon":
             for col in self.qof.columns:
                 if col == "h":
                     continue
                 data = self.qof_metrics[col][h - 1]
                 row[col] = int(np.nansum(data)) if col == "n" else np.nanmean(data)
+
         elif self.qof_calculation_mode == "aggregated_horizons":
             for col in self.qof.columns:
                 if col == "h":
                     continue
                 data = self.qof_metrics[col][0:h].flatten()
                 row[col] = int(np.nansum(data)) if col == "n" else np.nanmean(data)
+
         if self.modeling_approach == "joint":
             self.qof = pd.concat([self.qof, pd.DataFrame([row])], ignore_index=True)
+
     if self.modeling_approach == "individual":
         self.qof = pd.concat([self.qof, pd.DataFrame([row])], ignore_index=True)
+
+    # -------------------------------------------------------------------------
+    # Split into separate point and interval tables
+    # -------------------------------------------------------------------------
+    point_default_cols = [
+        "h",
+        "n",
+        "MSE Normalized",
+        "MAE Normalized",
+        "MAE Original",
+        "sMAPE Original",
+    ]
+
+    interval_default_cols = [
+        "h",
+        "n",
+        "PICP Original",
+        "ACE Original",
+        "PINAW Original",
+        "MIS Original",
+        "WIS Original",
+    ]
+
+    point_cols = self.args.get("qof_to_display", point_default_cols)
+    interval_cols = self.args.get("pi_to_display", interval_default_cols)
+
+    self.qof_point = self.qof[point_cols].copy()
+
+    if self.forecast_type == "interval":
+        self.qof_interval = self.qof[interval_cols].copy()
+    else:
+        self.qof_interval = None
 
     if self.args.get("internal_diagnose"):
         return self.qof_metrics["MAE Normalized"], self.qof_metrics["MAE Original"]
     else:
-        for metric in self.args["qof_to_display"][2:]:
-
+        # ---------------------------------------------------------------------
+        # Plot only point metrics from qof_to_display
+        # ---------------------------------------------------------------------
+        for metric in point_cols[2:]:
             custom_colors = [
                 "#1f77b4",
                 "#ff7f0e",
@@ -457,7 +566,6 @@ def diagnose(self):
                     markersize=1.2,
                 )
 
-            # plt.title(metric, fontsize=10)
             plt.xlabel("Horizons", fontsize=9)
             plt.ylabel(metric, fontsize=9)
 
